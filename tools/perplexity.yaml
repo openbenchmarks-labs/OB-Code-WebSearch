@@ -1,0 +1,32 @@
+tool: perplexity
+setups:
+  perplexity_web_tool:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true
+  perplexity_fast_tool:
+    class: main
+    pricing:
+      list_usd: 0.001
+      basis: list
+      bills_empty: true
+  perplexity_web_tool_budget:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true
+  perplexity_web_mcp:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true
+  perplexity_web_tool_siteq:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true

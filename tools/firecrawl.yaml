@@ -1,0 +1,14 @@
+tool: firecrawl
+setups:
+  firecrawl:
+    class: main
+    pricing:
+      list_usd: 0.01
+      basis: list
+      bills_empty: false
+  firecrawl_domains:
+    class: main
+    pricing:
+      list_usd: 0.01
+      basis: list
+      bills_empty: false

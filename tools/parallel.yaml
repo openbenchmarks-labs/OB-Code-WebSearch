@@ -1,0 +1,26 @@
+tool: parallel
+setups:
+  parallel_fast_tool:
+    class: main
+    pricing:
+      list_usd: 0.001
+      basis: list
+      bills_empty: true
+  parallel_advanced_tool:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true
+  parallel_fast:
+    class: main
+    pricing:
+      list_usd: 0.001
+      basis: list
+      bills_empty: true
+  parallel_fast_raw:
+    class: main
+    pricing:
+      list_usd: 0.001
+      basis: list
+      bills_empty: true

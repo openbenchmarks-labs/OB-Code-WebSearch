@@ -1,0 +1,8 @@
+subject: coding_agent
+model: gpt-6-sol
+limits:
+  max_turns: 32
+  max_searches: 5
+  results_per_search: 8
+  preview_chars: 32000
+repeats: 3

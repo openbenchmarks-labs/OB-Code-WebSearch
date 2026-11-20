@@ -1,0 +1,29 @@
+judge:
+  name: answer-grader-v1
+  outcomes:
+    correct: correct
+    wrong: wrong
+    not_scoreable: excluded
+  fields:
+    answer:
+      comparator: frozen
+      grader: OB-Code-Websearch
+      version: answer-grader-v1
+      source:
+        file: judge/grader.py
+        sha256: 0b554ca3844a95ece164d314c2c92ef48ada2af19422d50b1607b6744dd49962
+board:
+  item: pass_fail
+  average: questions
+  fields:
+  - answer
+  interval: wilson95
+  groups:
+    private:
+      sets:
+      - private
+    validation:
+      sets:
+      - validation
+  main: private
+  min_scored: 1

@@ -1,0 +1,20 @@
+tool: tako
+setups:
+  tako:
+    class: main
+    pricing:
+      list_usd: 0.007
+      basis: list
+      bills_empty: true
+  tako_plain:
+    class: main
+    pricing:
+      list_usd: 0.007
+      basis: list
+      bills_empty: true
+  tako_snippet_3400:
+    class: main
+    pricing:
+      list_usd: 0.007
+      basis: list
+      bills_empty: true

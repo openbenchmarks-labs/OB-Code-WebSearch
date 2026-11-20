@@ -1,0 +1,14 @@
+tool: brave
+setups:
+  brave:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true
+  brave_tokens_6100:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true

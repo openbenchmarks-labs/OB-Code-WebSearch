@@ -1,0 +1,32 @@
+tool: exa
+setups:
+  exa_auto:
+    class: main
+    pricing:
+      list_usd: 0.007
+      basis: list
+      bills_empty: false
+  exa_auto_domains:
+    class: main
+    pricing:
+      list_usd: 0.007
+      basis: list
+      bills_empty: false
+  exa_fast:
+    class: main
+    pricing:
+      list_usd: 0.007
+      basis: list
+      bills_empty: false
+  exa_lite:
+    class: main
+    pricing:
+      list_usd: 0.004
+      basis: list
+      bills_empty: false
+  exa_instant:
+    class: main
+    pricing:
+      list_usd: 0.004
+      basis: list
+      bills_empty: false

@@ -1,0 +1,14 @@
+tool: tavily
+setups:
+  tavily_advanced:
+    class: main
+    pricing:
+      list_usd: 0.016
+      basis: list
+      bills_empty: true
+  tavily_basic:
+    class: main
+    pricing:
+      list_usd: 0.008
+      basis: list
+      bills_empty: true

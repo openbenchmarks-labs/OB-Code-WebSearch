@@ -1,0 +1,7 @@
+name: OB-Code-Websearch
+order:
+  serves: Teams choosing a web search API as the search step of a coding agent that writes code against enterprise product APIs (Workday, SAP, UKG, Veeva, Genesys, ServiceNow).
+  win: The search API with which the agent answers more ranked questions in the held-out set with a request the ground truth accepts, under the same model, budget, and day; ties within noise.
+  budget_usd: 0
+  refresh_days: 30
+  not_measured_max: 0.1

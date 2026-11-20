@@ -1,0 +1,20 @@
+tool: keenable
+setups:
+  keenable_pro:
+    class: main
+    pricing:
+      list_usd: 0.004
+      basis: list
+      bills_empty: true
+  keenable_realtime:
+    class: main
+    pricing:
+      list_usd: 0.004
+      basis: list
+      bills_empty: true
+  keenable_pro_snippet4000:
+    class: main
+    pricing:
+      list_usd: 0.004
+      basis: list
+      bills_empty: true

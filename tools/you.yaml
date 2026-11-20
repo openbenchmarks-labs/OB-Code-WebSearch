@@ -1,0 +1,20 @@
+tool: you
+setups:
+  you_highlights_core:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true
+  you_highlights:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true
+  you_highlights_core_documented:
+    class: main
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: true
