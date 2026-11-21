@@ -8,6 +8,7 @@ question_id: task_id
 split_axes: [vendor, kind]
 split_gap_max: 0.1
 ranked_set: private
+modes: [search_only, search_and_fetch]
 baselines: [no_search]
 window_hours: 24
 concurrency: 4
