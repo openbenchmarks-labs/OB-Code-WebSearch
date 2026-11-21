@@ -1,18 +1,21 @@
 tool: nimble
 setups:
   nimble_standard:
+    mode: [search_only, search_and_fetch]
     class: main
     pricing:
       list_usd: 0.005
       basis: list
       bills_empty: true
   nimble_lite_coding:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.0011
       basis: list
       bills_empty: true
   nimble_lite:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.0011

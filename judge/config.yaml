@@ -27,3 +27,7 @@ board:
       - validation
   main: private
   min_scored: 1
+verifier:
+  model: gpt-6-sol
+  usd_per_mtok: {input: 2.00, output: 10.00}
+verify_usd: {expected: 0.01, max: 0.05}

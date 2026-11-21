@@ -1,24 +1,30 @@
 tool: parallel
 setups:
   parallel_fast_tool:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.001
       basis: list
       bills_empty: true
   parallel_advanced_tool:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.005
       basis: list
       bills_empty: true
   parallel_fast:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.001
       basis: list
       bills_empty: true
+      source: https://docs.parallel.ai/getting-started/pricing (Search API fast, $1 / 1k requests)
+      date: 2026-11-19
   parallel_fast_raw:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.001

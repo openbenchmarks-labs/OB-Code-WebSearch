@@ -1,18 +1,21 @@
 tool: you
 setups:
   you_highlights_core:
+    mode: [search_only, search_and_fetch]
     class: main
     pricing:
       list_usd: 0.005
       basis: list
       bills_empty: true
   you_highlights:
+    mode: [search_only, search_and_fetch]
     class: main
     pricing:
       list_usd: 0.005
       basis: list
       bills_empty: true
   you_highlights_core_documented:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.005

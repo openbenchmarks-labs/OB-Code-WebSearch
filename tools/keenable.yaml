@@ -1,18 +1,21 @@
 tool: keenable
 setups:
   keenable_pro:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.004
       basis: list
       bills_empty: true
   keenable_realtime:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.004
       basis: list
       bills_empty: true
   keenable_pro_snippet4000:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.004

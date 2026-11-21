@@ -1,12 +1,14 @@
 tool: firecrawl
 setups:
   firecrawl:
+    mode: [search_only, search_and_fetch]
     class: main
     pricing:
       list_usd: 0.01
       basis: list
       bills_empty: false
   firecrawl_domains:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.01

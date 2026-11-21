@@ -1,12 +1,14 @@
 tool: tavily
 setups:
   tavily_advanced:
+    mode: [search_only, search_and_fetch]
     class: main
     pricing:
       list_usd: 0.016
       basis: list
       bills_empty: true
   tavily_basic:
+    mode: [search_only, search_and_fetch]
     class: main
     pricing:
       list_usd: 0.008

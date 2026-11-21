@@ -1,18 +1,21 @@
 tool: tako
 setups:
   tako:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.007
       basis: list
       bills_empty: true
   tako_plain:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.007
       basis: list
       bills_empty: true
   tako_snippet_3400:
+    mode: search_only
     class: main
     pricing:
       list_usd: 0.007
