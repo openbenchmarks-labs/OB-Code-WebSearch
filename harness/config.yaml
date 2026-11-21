@@ -1,8 +1,18 @@
 subject: coding_agent
 model: gpt-6-sol
+effort: medium
 limits:
   max_turns: 32
   max_searches: 5
+  max_fetches: 5
   results_per_search: 8
   preview_chars: 32000
 repeats: 3
+usd_per_mtok: {input: 2.00, output: 10.00}
+# The model cost of one answer. Measured with exa_fast, so it holds up to 5 x $0.007 of searches that the estimate
+# adds again: an over-count of at most $0.035 an answer.
+answer_usd:
+  expected: 0.30
+  max: 0.60
+  source: a paid run of 5 answers on gpt-6-sol with exa_fast, $0.21 to $0.36 each
+  date: 2026-11-20
