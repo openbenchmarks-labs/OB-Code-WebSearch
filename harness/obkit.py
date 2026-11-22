@@ -43,10 +43,17 @@ class _Sent(Exception):
 
 
 def _task(row: dict) -> CodingTask:
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl") as f:
-        f.write(json.dumps(row) + "\n")
-        f.flush()
-        return load_tasks(Path(f.name))[0]
+    return CodingTask(
+        id=row["task_id"],
+        prompt=row["prompt"],
+        starter_code=row["starter_code"],
+        gold_code=row["gold_code"],
+        outfile=row["outfile"],
+        retrieval_key=row["retrieval_key"],
+        required=list(row.get("required") or []),
+        query_forbidden=list(row.get("query_forbidden") or []),
+        known_issue=row.get("known_issue"),
+    )
 
 
 def _arms() -> dict[str, tuple[str, str]]:
