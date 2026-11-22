@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import html
+import http.client
+import json
 import re
+import threading
+import urllib.parse
 import urllib.request
 from functools import cache
 from pathlib import Path
@@ -49,27 +53,64 @@ def verify(question: dict, answer: str, passed: bool, *, dry: bool) -> dict:
     return {"verdict": verdict, "cost_usd": cost}
 
 
-@cache
-def _page(url: str) -> str | None:
-    """A docs page as plain text, or None when it cannot be read without a browser."""
+SAP_TOPIC = re.compile(r"https://help\.sap\.com/docs/([^/]+)/([^/]+)/([^/?#]+)")
+SAP_LOCK = threading.Lock()  # help.sap.com answers parallel requests with 403 Access Denied
+
+
+def _fetch(url: str, timeout: int = 20) -> str | None:
     request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            text = response.read().decode("utf-8", "replace")
-    except (OSError, ValueError):
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.read().decode("utf-8", "replace")
+    except (OSError, ValueError, http.client.HTTPException):
         return None
-    text = html.unescape(re.sub(r"<[^>]+>", " ", text)).replace("\\", "")
+
+
+@cache
+def _page(url: str) -> str | None:
+    """A docs page as plain text, or None when it cannot be read without a browser. SAP Help draws its pages with
+    scripts, so its pages are read from the page content service the scripts load."""
+    url = url.split("#")[0]
+    if topic := SAP_TOPIC.match(url):
+        product, deliverable, file = topic.groups()
+        found = {"product_url": product, "deliverable_url": deliverable, "topic_url": file, "version": "LATEST"}
+        with SAP_LOCK:
+            meta = _fetch("https://help.sap.com/http.svc/deliverableMetadata?" + urllib.parse.urlencode(found))
+        try:
+            data = json.loads(meta)["data"]
+            ask = {"deliverableInfo": 1, "deliverable_id": data["deliverable"]["id"], "buildNo": data["deliverable"]["buildNo"]}
+            with SAP_LOCK:
+                content = _fetch("https://help.sap.com/http.svc/pagecontent?" + urllib.parse.urlencode({**ask, "file_path": data["filePath"]}))
+            return _text(json.loads(content)["data"]["body"]) or None
+        except (TypeError, ValueError, KeyError):
+            return None
+    text = _fetch(url)
+    if text is None:
+        return None
+    text = _text(text)
     return text if len(text) >= 2000 else None
 
 
-def _pattern(right: dict) -> re.Pattern:
-    """The accepted request as a docs page writes it: the SOAP operation, or the last three path segments with any
-    placeholder or version standing for whatever the page puts there."""
+def _text(page: str) -> str:
+    return html.unescape(re.sub(r"<[^>]+>", " ", page)).replace("\\", "")
+
+
+def _shows(right: dict, page: str) -> bool:
+    """Whether a docs page writes the accepted request: the SOAP operation; else the last three path segments,
+    with any placeholder or version standing for whatever the page puts there and any key in parentheses after a
+    segment, as in `User('cgrant')/teamMembersSize`. An OData entity set or function import (`/odata/v2/<Name>`)
+    is often shown only by name on its reference page, so the bare name counts when no URI on the page puts it
+    under another path (`/odata/v2/restricted/<Name>`)."""
     if right.get("soap"):
-        return re.compile(re.escape(right["soap"]))
+        return right["soap"] in page
     path = re.sub(r"\([^)]*\)", "", right["address"].split("?")[0]).strip("/").split("/")
+    if len(path) == 3 and path[0] == "odata" and re.fullmatch(r"v\d+", path[1]):
+        name = re.escape(path[2])
+        if re.search(rf"odata/v\d+/\s*{name}\b", page, re.IGNORECASE):
+            return True
+        return not re.search(rf"/\s*{name}\b", page) and bool(re.search(rf"\b{name}\b", page))
     parts = [r"[^/\s]*" if p.startswith("{") or re.fullmatch(r"v\d+(\.\d+)?", p) else re.escape(p) for p in path[-3:]]
-    return re.compile("/".join(parts), re.IGNORECASE)
+    return bool(re.search(r"(?:\([^)]*\))?/\s*".join(parts), page, re.IGNORECASE))
 
 
 def key_check(question: dict):
@@ -78,7 +119,7 @@ def key_check(question: dict):
     key = question["retrieval_key"]
     pages = [_page(url) for url in (key.get("docs") or [question["source_url"]])]
     readable = [page for page in pages if page is not None]
-    if any(_pattern(right).search(page) for right in key["accepted"] for page in readable):
+    if any(_shows(right, page) for right in key["accepted"] for page in readable):
         return True
     if len(readable) < len(pages):
         return None
