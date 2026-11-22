@@ -12,7 +12,7 @@ Each task gives a coding agent a realistic integration ticket against an enterpr
 
 - **Two boards:** **Search only** and **Search & fetch** are ranked separately.
 - **Fixed protocol:** Every tool runs with the same coding model, turn limit, search budget, and day (`harness/config.yaml`).
-- **Scoring:** `judge/` grades each final answer against ground truth, checking the constructed request, code extraction, citations, and retrieval (`judge/config.yaml`). Primary metrics are grounded task completion accuracy, latency, and token efficiency.
+- **Scoring:** `judge/` grades each final answer against ground truth; [`judge/README.md`](judge/README.md#what-the-answer-grader-checks) says what the answer grader in this repo checks and what it does not. Primary metrics are task completion accuracy, latency, and token efficiency.
 
 ## Tools evaluated
 
