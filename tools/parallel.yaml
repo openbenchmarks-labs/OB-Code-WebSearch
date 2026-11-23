@@ -9,7 +9,7 @@ setups:
       bills_empty: true
       fetch_usd: 0.001
       fetch_source: https://docs.parallel.ai/getting-started/pricing (Extract API, $1 / 1,000 URLs)
-      fetch_date: 2026-11-24
+      fetch_date: 2026-11-23
   parallel_advanced_tool:
     mode: search_only
     class: main

@@ -21,15 +21,17 @@ not_measured_max: 0.1
 judge_error_max: 0.05
 # The published method (lab.openbenchmarks.com/ob-code-websearch, Evaluation Metrics) for the validation and private sets.
 # Ranked: questions with an answer page that robots.txt opens to all nine crawler names; the rest run once, apart.
-# Weights: each group's pool times its share with an open answer page (525 x 297/399 and 380 x 141/316), normalised.
+# Weights: each group's pool times its share with an open answer page, normalised: 525 x 297/399 = 390.79 and
+# 380 x 141/316 = 169.56, so 0.6974 and 0.3026 (shown rounded as 70% and 30%).
 scoring:
   sets: {validation: 1, private: 3}
   item: share
   apart: {field: crawler_open, equals: false, repeats: 1}
-  groups: {field: question_group, weights: {first selection: 0.7, extension: 0.3}}
+  groups: {field: question_group, weights: {first selection: 0.6974, extension: 0.3026}}
   bootstrap: {draws: 10000, seed: 20261117}
   attempts: 3
   unfinished_max: 4
+  halt_after: 3
 hooks:
   selftest: python -B -m harness.obkit data/questions.jsonl
   answer: harness.obkit:answer

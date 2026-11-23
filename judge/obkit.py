@@ -50,7 +50,19 @@ def _read(reader: dict, user: str) -> tuple[str, float]:
     text = "".join(part.get("text", "") for part in body["output"]["message"]["content"])
     price = reader["usd_per_mtok"]
     cost = (body["usage"]["inputTokens"] * price["input"] + body["usage"]["outputTokens"] * price["output"]) / 1e6
-    return ((text.strip().splitlines() or [""])[-1].strip().upper()), cost
+    return _verdict(text), cost
+
+
+def _verdict(text: str) -> str:
+    """The `verdict` of the last {"verdict": ...} object in a reply, as the prompt asks; "" when there is none."""
+    starts = [m.start() for m in re.finditer(r'\{\s*"verdict"', text)]
+    if not starts:
+        return ""
+    try:
+        vote = json.JSONDecoder().raw_decode(text, starts[-1])[0]
+    except ValueError:
+        return ""
+    return str(vote.get("verdict", "")).strip().upper()
 
 
 def verify(question: dict, answer: str, passed: bool, *, dry: bool) -> dict:
@@ -66,10 +78,7 @@ def verify(question: dict, answer: str, passed: bool, *, dry: bool) -> dict:
         f"{r['method']} {r['address']}" + (f" (SOAP {r['soap']})" if r.get("soap") else "")
         for r in question["retrieval_key"]["accepted"]
     )
-    user = (
-        f"Task:\n{question['ticket']}\n\nRight answers:\n{right}\n\nAgent's call:\n{answer}\n\n"
-        "End with one line: PASS, FAIL or UNSURE."
-    )
+    user = f"Task:\n{question['ticket']}\n\nRight answers:\n{right}\n\nAgent's call:\n{answer}"
     cost = 0.0
     for reader in (CONFIG["verifier"]["first"], CONFIG["verifier"]["second"]):
         word, spent = _read(reader, user)
