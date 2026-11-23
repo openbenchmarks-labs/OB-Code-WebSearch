@@ -1,7 +1,7 @@
 name: OB-Code-Websearch
 serves: Teams choosing a web search API as the search step of a coding agent that writes code against enterprise product APIs (Workday, SAP, UKG, Veeva, Genesys, ServiceNow).
 win: The search API with which the agent answers more ranked questions in the held-out set with a request the ground truth accepts, under the same model, budget, and day; ties within noise.
-obkit: 0.4.0
+obkit: 0.5.1
 sets:
   public: {path: data/questions.jsonl}
   validation: {sha256: 599b58d761fb8749312646d2109d0c18943925923568f04d1fe246b3b283604a}
