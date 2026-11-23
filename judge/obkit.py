@@ -23,14 +23,14 @@ VERDICTS = {"PASS": True, "FAIL": False}
 
 
 def grade(question: dict, answer: str) -> bool:
-    return grade_call(question["retrieval_key"]["accepted"], answer).passed
+    return grade_call(question["retrieval_key"]["accepted"], answer)
 
 
 def verify(question: dict, answer: str, passed: bool, *, dry: bool) -> dict:
     """agree, disagree or unsure with the deterministic verdict, and what the call cost. It never changes a score."""
     if dry:
         return {"verdict": "agree", "cost_usd": 0.0}
-    from harness.run import load_environment, make_llm_client
+    from harness.obkit import load_environment, make_llm_client
 
     load_environment()
     right = "\n".join(

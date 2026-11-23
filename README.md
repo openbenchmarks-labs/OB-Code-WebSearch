@@ -30,9 +30,9 @@ See [`data/README.md`](data/README.md) for the full file format and field defini
 ## Repository structure
 
 - [`data/`](data/README.md): 30 public benchmark questions and schema documentation.
-- [`harness/`](harness/README.md): Coding agent loop, search API adapters, and CLI runner (`harness/run.py`).
+- [`harness/`](harness/README.md): Agent loop, search API adapters, and the obkit entry points (`harness/obkit.py`).
 - [`tools/`](tools/README.md): One `<tool>.yaml` config per search API (13 tools).
-- [`judge/`](judge/README.md): Grading rules, code/citation/retrieval checks, and board aggregation.
+- [`judge/`](judge/README.md): The question the agent gets, the answer grader, and the LLM verifier.
 - [`benchmark.yaml`](benchmark.yaml): Benchmark contract, scope, and refresh cadence.
 - [`AGENTS.md`](AGENTS.md): Entry guide for coding agents.
 
@@ -42,15 +42,10 @@ Run the offline verification check (no API keys required):
 
 ```sh
 uv venv && uv pip install -r requirements.txt
-.venv/bin/python -B -m harness.run selftest --tasks data/questions.jsonl
+.venv/bin/python -B -m harness.obkit data/questions.jsonl
 ```
 
-To run against live APIs, copy `.env.example` to `.env`, add the required API keys, and inspect runner options:
-
-```sh
-cp .env.example .env
-.venv/bin/python -m harness.run --help
-```
+Live runs go through [obkit](AGENTS.md), which reads API keys from `.env` (copy `.env.example`) or the environment.
 
 ## Adding or updating a tool
 

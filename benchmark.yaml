@@ -20,7 +20,7 @@ refresh_days: 30
 not_measured_max: 0.1
 judge_error_max: 0.05
 hooks:
-  selftest: python -B -m harness.run selftest --tasks data/questions.jsonl
+  selftest: python -B -m harness.obkit data/questions.jsonl
   answer: harness.obkit:answer
   contract: harness.obkit:contract
   probe: harness.obkit:probe

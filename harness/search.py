@@ -1,11 +1,6 @@
-"""Pluggable web-search backends.
-
-HTTP call + hit shape for Parallel, Firecrawl, Exa, Linkup, Tavily, Brave
-(LLM Context), SERP RapidAPI, You.com, TinyFish, Tako, Perplexity, Nimble and
-Keenable. Vendors are locked to search-only vs search-fetch boards in
-SEARCH_ONLY_BACKENDS / SEARCH_FETCH_BACKENDS. Nimble, Tavily Basic, Firecrawl,
-You and TinyFish sit on both. Keenable, Tako, Perplexity and SERP are search-only.
-"""
+"""Web-search backends: the HTTP call and hit shape for Parallel, Firecrawl, Exa, Linkup, Tavily, Brave (LLM Context),
+SERP RapidAPI, You.com, TinyFish, Tako, Perplexity, Nimble and Keenable. `tools/*.yaml` names the setups and the
+modes each runs in."""
 
 from __future__ import annotations
 
@@ -19,22 +14,8 @@ from typing import Any, Protocol
 
 import requests
 
-# --- Nimble REST helper ---
-"""Shared Nimble request shapes and source-only response parsing."""
-
-
-import math
-
 _NIMBLE_SEARCH_URL = "https://sdk.nimbleway.com/v2/search"
 _NIMBLE_EXTRACT_URL = "https://sdk.nimbleway.com/v2/extract"
-SEARCH_PRICES = {"lite": 0.0011, "standard": 0.005}
-
-
-def search_body(query: str, depth: str, max_results: int) -> dict[str, Any]:
-    if depth not in SEARCH_PRICES:
-        raise ValueError(f"Unsupported Nimble search depth: {depth}")
-    return {"query": query, "search_depth": depth, "full_content": False,
-            "focus": "general", "max_results": max_results}
 
 
 def _nimble_search_hits(payload: Any, max_results: int) -> list[dict[str, str]]:
@@ -65,22 +46,8 @@ def _nimble_extract_page(payload: Any, url: str, max_chars: int) -> dict[str, An
     text = data.get("markdown") if isinstance(data, dict) else None
     if not isinstance(text, str) or not text.strip():
         raise RuntimeError("Nimble Extract returned no markdown content")
-    return {"requested_url": url, "final_url": payload.get("url") or url,
-            "title": "", "text": text[:max_chars], "truncated": len(text) > max_chars,
-            "fetch_provider": "nimble_extract"}
+    return {"url": payload.get("url") or url, "title": "", "content": text[:max_chars]}
 
-
-def extract_price() -> float | None:
-    raw = os.getenv("NIMBLE_EXTRACT_USD_PER_REQUEST", "").strip()
-    if not raw:
-        return None
-    value = float(raw)
-    if not math.isfinite(value) or value < 0:
-        raise ValueError("NIMBLE_EXTRACT_USD_PER_REQUEST must be finite and nonnegative")
-    return value
-# --- End Nimble REST helper ---
-
-from .logger import begin_request, end_request
 
 SEARCH_PREVIEW_BUDGET_CHARS = 32_000
 
@@ -105,46 +72,18 @@ TINYFISH_FETCH_TIMEOUT_S = 150
 TAKO_SEARCH_URL = "https://tako.com/api/v3/search"
 PERPLEXITY_SEARCH_URL = "https://api.perplexity.ai/search"
 KEENABLE_SEARCH_URL = "https://api.keenable.ai/v1/search"
-HEADER_REDACT_TOKENS = (
-    "authorization",
-    "api-key",
-    "api_key",
-    "apikey",
-    "x-api-key",
-    "x-rapidapi-key",
-    "rapidapi",
-    "token",
-    "secret",
-    "password",
-    "cookie",
-)
 # Failures on our side: the attempt stops and is not scored against the search tool. A transport failure (TLS,
-# connection reset, no HTTP status) is ours; a 429 is our
-# key's rate limit or our concurrency; the model client's connection or timeout failure (openai APIConnectionError) is
-# ours and transient too. `served_mode_mismatch`: the vendor served another mode than the lane sent, so the row would
-# measure a different product.
+# connection reset, no HTTP status) is ours; a 429 is our key's rate limit or our concurrency.
+# `served_mode_mismatch`: the vendor served another mode than the lane sent, so the row would measure a different
+# product.
 UNSCORED_FAILURES = frozenset({"local_error", "auth_configuration", "redirect_not_followed", "account_billing",
-                               "transport_error", "rate_limit", "vendor_server", "model_transport",
-                               "served_mode_mismatch"})
-# Transient: `--resume` runs such an attempt again, so every lane ends with the same question count. The first three
-# are ours; `model_content_filter` is Azure's content-filter refusal (HTTP 400, error code `content_filter` or
-# `invalid_prompt`), which is not the search tool's doing and has passed on an identical retry; `model_rate_limit` is
-# the model service's HTTP 429, as a search vendor's is `rate_limit`, and `model_server` its HTTP 5xx or 408, as a
-# search vendor's is `vendor_server`: one rule for both sides, under the same try cap. `recording_timeout` is the
-# stand-in recording of a starter or reference fix that did not finish in time: ours, and a question asked without its
-# "The program sends this request today" line would measure nothing.
-RERUN_FAILURES = frozenset({"transport_error", "rate_limit", "vendor_server", "model_transport",
-                            "model_content_filter", "model_rate_limit", "model_server", "recording_timeout"})
+                               "transport_error", "rate_limit", "vendor_server", "served_mode_mismatch"})
 DEFAULT_MAX_RESULTS = 8
 DEFAULT_MAX_FETCH_CHARS = 16000
 FETCH_TIMEOUT_S = 90
 # One search timeout for every lane: the largest any release lane used (Firecrawl, Nimble, Parallel basic).
 SEARCH_TIMEOUT_S = 60
 QUERY_PARAMETER = {"type": "string", "description": "Focused search query for this hop."}
-
-
-class SearchHit(dict):
-    """url / title / snippet."""
 
 
 class SearchBackend(Protocol):
@@ -288,12 +227,6 @@ class IntentTool:
         return self.search(request["query"], max_results=max_results, **fields)
 
 
-def _record_site_lift(backend: Any, sent: str, include_domains: list[str]) -> None:
-    if include_domains:
-        backend.last_meta["include_domains"] = include_domains
-        backend.last_meta["query_stripped"] = sent
-
-
 class ParallelBasic:
     name = "parallel_basic"
     mode = "basic"
@@ -310,7 +243,7 @@ class ParallelBasic:
         advanced: dict[str, Any] = {"max_results": max_results}
         if include_domains:
             advanced["source_policy"] = {"include_domains": include_domains}
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             PARALLEL_SEARCH_URL,
             headers={"x-api-key": key, "Content-Type": "application/json"},
@@ -322,10 +255,7 @@ class ParallelBasic:
             },
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_parallel_hits(payload, max_results=max_results)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, sent, include_domains)
-        return hits
+        return parse_parallel_hits(payload, max_results=max_results)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         key = os.environ.get("PARALLEL_API_KEY")
@@ -338,19 +268,14 @@ class ParallelBasic:
         }
         if objective.strip():
             body["objective"] = objective.strip()
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             PARALLEL_EXTRACT_URL,
             headers={"x-api-key": key, "Content-Type": "application/json"},
             json_body=body,
             timeout=FETCH_TIMEOUT_S,
         )
-        page = parse_parallel_extract(payload, url=url)
-        flags = _pop_flags(page)
-        meta = {**meta, **flags, "extract_id": flags.get("extract_id") or meta.get("extract_id")}
-        self.last_meta = meta
-        page["_meta"] = meta
-        return page
+        return parse_parallel_extract(payload, url=url)
 
 
 class ParallelFast(ParallelBasic):
@@ -363,7 +288,6 @@ class ParallelFastRaw(ParallelFast):
     `objective` (settings comparison arm)."""
 
     name = "parallel_fast_raw"
-    billed_sku = "parallel_fast"
     site_lift: SiteLift = None
 
 
@@ -381,7 +305,6 @@ class ParallelFastTool(ParallelFast):
     """
 
     name = "parallel_fast_tool"
-    billed_sku = "parallel_fast"
     queries_field = "search_queries"
     tool_parameters: dict[str, Any] = {
         "type": "object",
@@ -426,7 +349,7 @@ class ParallelFastTool(ParallelFast):
         advanced: dict[str, Any] = {"max_results": max_results}
         if include_domains:
             advanced["source_policy"] = {"include_domains": include_domains}
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             PARALLEL_SEARCH_URL,
             headers={"x-api-key": key, "Content-Type": "application/json"},
@@ -440,10 +363,7 @@ class ParallelFastTool(ParallelFast):
             },
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_parallel_hits(payload, max_results=max_results)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, " | ".join(sent), include_domains)
-        return hits
+        return parse_parallel_hits(payload, max_results=max_results)
 
 
 class ParallelAdvancedTool(ParallelFastTool):
@@ -451,23 +371,7 @@ class ParallelAdvancedTool(ParallelFastTool):
     when `mode` is omitted (parallel-api-search.md:262-265). One 60 s search timeout, as every lane."""
 
     name = "parallel_advanced_tool"
-    billed_sku = "parallel_advanced"
     mode = "advanced"
-
-
-class NoSearch:
-    """No web_search / web_fetch. Memory baseline for the locked tickets."""
-
-    name = "no_search"
-    last_meta: dict[str, Any] | None = None
-
-    def search(self, query: str, *, max_results: int = DEFAULT_MAX_RESULTS) -> list[dict[str, str]]:
-        del query, max_results
-        raise RuntimeError("no_search has no web_search")
-
-    def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
-        del url, objective
-        raise RuntimeError("no_search has no web_fetch")
 
 
 class FirecrawlSearch(IntentTool):
@@ -497,35 +401,28 @@ class FirecrawlSearch(IntentTool):
         body: dict[str, Any] = {"query": sent, "limit": max_results}
         if include_domains:
             body["includeDomains"] = include_domains
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             FIRECRAWL_SEARCH_URL,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json_body=body,
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_firecrawl_hits(payload, max_results=max_results)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, sent, include_domains)
-        return hits
+        return parse_firecrawl_hits(payload, max_results=max_results)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         del objective
         key = os.environ.get("FIRECRAWL_API_KEY")
         if not key:
             raise RuntimeError("FIRECRAWL_API_KEY is required for firecrawl")
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             FIRECRAWL_SCRAPE_URL,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json_body={"url": url, "formats": ["markdown"]},
             timeout=FETCH_TIMEOUT_S,
         )
-        page = parse_firecrawl_scrape(payload, url=url)
-        flags = _pop_flags(page)
-        self.last_meta = {**meta, **flags}
-        page["_meta"] = self.last_meta
-        return page
+        return parse_firecrawl_scrape(payload, url=url)
 
 
 class ExaSearch(IntentTool):
@@ -557,7 +454,7 @@ class ExaSearch(IntentTool):
     def search(self, query: str, *, max_results: int = DEFAULT_MAX_RESULTS, objective: str | None = None
                ) -> list[dict[str, str]]:
         sent, include_domains = site_request(self, query)
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             EXA_SEARCH_URL,
             headers={"x-api-key": self._key(), "Content-Type": "application/json"},
@@ -571,25 +468,18 @@ class ExaSearch(IntentTool):
             },
             timeout=120 if self.search_type == "deep" else SEARCH_TIMEOUT_S,
         )
-        hits = parse_exa_hits(payload, max_results=max_results)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, sent, include_domains)
-        return hits
+        return parse_exa_hits(payload, max_results=max_results)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         del objective
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             EXA_CONTENTS_URL,
             headers={"x-api-key": self._key(), "Content-Type": "application/json"},
             json_body={"urls": [url], "text": True},
             timeout=FETCH_TIMEOUT_S,
         )
-        page = parse_exa_contents(payload, url=url)
-        flags = _pop_flags(page)
-        self.last_meta = {**meta, **flags}
-        page["_meta"] = self.last_meta
-        return page
+        return parse_exa_contents(payload, url=url)
 
 
 class ExaAutoDomains(ExaSearch):
@@ -598,7 +488,6 @@ class ExaAutoDomains(ExaSearch):
     Every `site:` host moves into it, and `includeDomains` never relaxes, as `site:` in the query does."""
 
     name = "exa_auto_domains"
-    billed_sku = "exa_auto"
     site_lift: SiteLift = True
 
 
@@ -670,7 +559,7 @@ class LinkupSearch(IntentTool):
         if include_domains:
             body["includeDomains"] = include_domains
         try:
-            payload, meta = vendor_call(self,
+            payload, _ = vendor_call(self,
                 "POST",
                 LINKUP_SEARCH_URL,
                 headers=self._headers(),
@@ -684,14 +573,11 @@ class LinkupSearch(IntentTool):
             if meta.get("http_status") != 400 or "SEARCH_QUERY_NO_RESULT" not in str(meta.get("error_body") or ""):
                 raise
             payload = {"results": []}
-        hits = parse_linkup_hits(payload, max_results=max_results)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, q, include_domains)
-        return hits
+        return parse_linkup_hits(payload, max_results=max_results)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         del objective
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             LINKUP_FETCH_URL,
             headers=self._headers(),
@@ -702,11 +588,7 @@ class LinkupSearch(IntentTool):
             },
             timeout=FETCH_TIMEOUT_S,
         )
-        page = parse_linkup_fetch(payload, url=url)
-        flags = _pop_flags(page)
-        self.last_meta = {**meta, **flags}
-        page["_meta"] = self.last_meta
-        return page
+        return parse_linkup_fetch(payload, url=url)
 
 
 class LinkupStandard(LinkupSearch):
@@ -765,17 +647,14 @@ class TavilySearch(IntentTool):
         }
         if include_domains:
             body["include_domains"] = include_domains
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             TAVILY_SEARCH_URL,
             headers=self._headers(),
             json_body=body,
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_tavily_hits(payload, max_results=max_results)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, sent, include_domains)
-        return hits
+        return parse_tavily_hits(payload, max_results=max_results)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         body: dict[str, Any] = {
@@ -786,18 +665,14 @@ class TavilySearch(IntentTool):
         }
         if objective.strip():
             body["query"] = objective.strip()
-        payload, meta = vendor_call(self,
+        payload, _ = vendor_call(self,
             "POST",
             TAVILY_EXTRACT_URL,
             headers=self._headers(),
             json_body=body,
             timeout=FETCH_TIMEOUT_S,
         )
-        page = parse_tavily_extract(payload, url=url)
-        flags = _pop_flags(page)
-        self.last_meta = {**meta, **flags}
-        page["_meta"] = self.last_meta
-        return page
+        return parse_tavily_extract(payload, url=url)
 
 
 class TavilyBasic(TavilySearch):
@@ -841,25 +716,19 @@ class NimbleLite(IntentTool):
             body["focus"] = self.focus
         if include_domains:
             body["include_domains"] = include_domains
-        payload, meta = vendor_call(self, "POST", _NIMBLE_SEARCH_URL,
+        payload, _ = vendor_call(self, "POST", _NIMBLE_SEARCH_URL,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json_body=body, timeout=SEARCH_TIMEOUT_S)
-        hits = _nimble_search_hits(payload, max_results)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, sent, include_domains)
-        return hits
+        return _nimble_search_hits(payload, max_results)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         key = os.environ.get("NIMBLE_API_KEY")
         if not key:
             raise RuntimeError(f"NIMBLE_API_KEY is required for {self.name}")
-        payload, meta = vendor_call(self, "POST", _NIMBLE_EXTRACT_URL,
+        payload, _ = vendor_call(self, "POST", _NIMBLE_EXTRACT_URL,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json_body={"url": url, "formats": ["markdown"]}, timeout=FETCH_TIMEOUT_S)
-        extracted = _nimble_extract_page(payload, url, DEFAULT_MAX_FETCH_CHARS)
-        self.last_meta = {**meta, "truncated": extracted["truncated"]}
-        return {"url": extracted["final_url"], "title": extracted["title"],
-                "content": extracted["text"], "_meta": self.last_meta}
+        return _nimble_extract_page(payload, url, DEFAULT_MAX_FETCH_CHARS)
 
 
 class NimbleStandard(NimbleLite):
@@ -876,7 +745,6 @@ class NimbleLiteCoding(NimbleLite):
     "Focus modes only work with search_depth: lite", :508). Billed as lite (nimble-pricing.md:47)."""
 
     name = "nimble_lite_coding"
-    billed_sku = "nimble_lite"
     focus = "coding"
 
 
@@ -910,7 +778,7 @@ class BraveSearch(IntentTool):
     def search(self, query: str, *, max_results: int = DEFAULT_MAX_RESULTS) -> list[dict[str, str]]:
         n = max(1, min(int(max_results), 50))
         sent, _ = site_request(self, query)
-        payload, meta = vendor_call(
+        payload, _ = vendor_call(
             self,
             "POST",
             BRAVE_LLM_CONTEXT_URL,
@@ -928,9 +796,7 @@ class BraveSearch(IntentTool):
             },
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_brave_hits(payload, max_results=n)
-        self.last_meta = _search_meta(meta, hits)
-        return hits
+        return parse_brave_hits(payload, max_results=n)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         del url, objective
@@ -944,7 +810,6 @@ class BraveTokens(BraveSearch):
     Brave search would have passed the 32,000-character preview; at the default 8,192 some did."""
 
     name = "brave_tokens_6100"
-    billed_sku = "brave"
     maximum_number_of_tokens = 6100
 
 
@@ -1001,9 +866,7 @@ class SerpSearch:
         if refused:
             self.last_meta = {**meta, "upstream_status": refused}
             raise RuntimeError(f"RapidAPI x-service-info reports upstream HTTP {refused} behind HTTP 200")
-        hits = parse_serp_hits(payload, max_results=n)
-        self.last_meta = _search_meta(meta, hits)
-        return hits
+        return parse_serp_hits(payload, max_results=n)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         del url, objective
@@ -1016,7 +879,6 @@ class SerpEnUs(SerpSearch):
     explicitly" (§11)."""
 
     name = "serp_en_us"
-    billed_sku = "serp"
     locale = {"hl": "en", "gl": "us"}
 
 
@@ -1061,7 +923,7 @@ class YouSearch(IntentTool):
     def search(self, query: str, *, max_results: int = DEFAULT_MAX_RESULTS) -> list[dict[str, str]]:
         n = max(1, min(int(max_results), 100))
         sent, _ = site_request(self, query)
-        payload, meta = vendor_call(
+        payload, _ = vendor_call(
             self,
             "POST",
             YOU_SEARCH_URL,
@@ -1069,13 +931,11 @@ class YouSearch(IntentTool):
             json_body={"query": sent, "count": n},
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_you_hits(payload, max_results=n)
-        self.last_meta = _search_meta(meta, hits)
-        return hits
+        return parse_you_hits(payload, max_results=n)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         del objective
-        payload, meta = vendor_call(
+        payload, _ = vendor_call(
             self,
             "POST",
             YOU_CONTENTS_URL,
@@ -1083,11 +943,7 @@ class YouSearch(IntentTool):
             json_body={"urls": [url], "formats": ["markdown"], "crawl_timeout": 20},
             timeout=FETCH_TIMEOUT_S,
         )
-        page = parse_you_contents(payload, url=url)
-        flags = _pop_flags(page)
-        self.last_meta = {**meta, **flags}
-        page["_meta"] = self.last_meta
-        return page
+        return parse_you_contents(payload, url=url)
 
 
 class YouHighlights(YouSearch):
@@ -1107,7 +963,7 @@ class YouHighlights(YouSearch):
         n = max(1, min(int(max_results), 100))
         sent, include_domains = site_request(self, query)
         highlights = {"total_max_tokens": self.total_max_tokens} if self.total_max_tokens else {}
-        payload, meta = vendor_call(
+        payload, _ = vendor_call(
             self,
             "POST",
             YOU_SEARCH_URL,
@@ -1121,10 +977,7 @@ class YouHighlights(YouSearch):
             },
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_you_hits(payload, max_results=n)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, sent, include_domains)
-        return hits
+        return parse_you_hits(payload, max_results=n)
 
 class YouHighlightsCore(YouHighlights):
     name = "you_highlights_core"
@@ -1137,7 +990,6 @@ class YouHighlightsCoreDocumented(YouHighlightsCore):
     characters, so You's own budget, not the shared 32,000-character one, decides what text arrives."""
 
     name = "you_highlights_core_documented"
-    billed_sku = "you_highlights_core"
     site_lift: SiteLift = True
     total_max_tokens = 7000
 
@@ -1148,7 +1000,6 @@ class FirecrawlDomains(FirecrawlSearch):
     default web search."""
 
     name = "firecrawl_domains"
-    billed_sku = "firecrawl"
     site_lift: SiteLift = True
 
 
@@ -1187,7 +1038,7 @@ class TinyfishSearch(IntentTool):
         params: dict[str, Any] = {"query": sent, **({"purpose": purpose[:2000]} if purpose else {})}
         if include_domains:
             params["include_domains"] = ",".join(include_domains)
-        payload, meta = vendor_call(
+        payload, _ = vendor_call(
             self,
             "GET",
             TINYFISH_SEARCH_URL,
@@ -1195,16 +1046,13 @@ class TinyfishSearch(IntentTool):
             params=params,
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_tinyfish_hits(payload, max_results=max_results)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, sent, include_domains)
-        return hits
+        return parse_tinyfish_hits(payload, max_results=max_results)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         body: dict[str, Any] = {"urls": [url], "format": "markdown"}
         if objective.strip():
             body["purpose"] = objective.strip()[:2000]
-        payload, meta = vendor_call(
+        payload, _ = vendor_call(
             self,
             "POST",
             TINYFISH_FETCH_URL,
@@ -1212,11 +1060,7 @@ class TinyfishSearch(IntentTool):
             json_body=body,
             timeout=TINYFISH_FETCH_TIMEOUT_S,
         )
-        page = parse_tinyfish_fetch(payload, url=url)
-        flags = _pop_flags(page)
-        self.last_meta = {**meta, **flags}
-        page["_meta"] = self.last_meta
-        return page
+        return parse_tinyfish_fetch(payload, url=url)
 
 
 class TinyfishNoPurpose(TinyfishSearch):
@@ -1225,7 +1069,6 @@ class TinyfishNoPurpose(TinyfishSearch):
     sends the agent-written `purpose`, as TinyFish's own tool tells the agent to ("Always provide purpose")."""
 
     name = "tinyfish_no_purpose"
-    billed_sku = "tinyfish"
     intent_field = None
     intent_description = ""
 
@@ -1268,7 +1111,7 @@ class TakoSearch(IntentTool):
             web["snippet_max_chars"] = self.snippet_max_chars
         if include_domains:
             web["include_domains"] = include_domains
-        payload, meta = vendor_call(
+        payload, _ = vendor_call(
             self,
             "POST",
             TAKO_SEARCH_URL,
@@ -1276,10 +1119,7 @@ class TakoSearch(IntentTool):
             json_body={"query": sent, "sources": {"web": web}},
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_tako_hits(payload, max_results=n)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, sent, include_domains)
-        return hits
+        return parse_tako_hits(payload, max_results=n)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         del url, objective
@@ -1291,7 +1131,6 @@ class TakoPlain(TakoSearch):
     tako-search-v3-reference.md:1020-1030)."""
 
     name = "tako_plain"
-    billed_sku = "tako"
     highlights = False
 
 
@@ -1300,7 +1139,6 @@ class TakoSnippet3400(TakoSearch):
     fit the 32,000-character preview after the largest v1 url + title total."""
 
     name = "tako_snippet_3400"
-    billed_sku = "tako"
     snippet_max_chars = 3400
 
 
@@ -1312,7 +1150,6 @@ class PerplexitySearch:
     (perplexity-search-quickstart.md:281) and is one search in the budget.
     """
 
-    billed_sku = "perplexity_web"
     search_type: str | None = None
     budget: dict[str, int] = {}
     # search_domain_filter takes root domains, max 20 (perplexity-domain-filter.md:13, 80-110); the docs document no
@@ -1329,7 +1166,7 @@ class PerplexitySearch:
             body["search_type"] = self.search_type
         if include_domains:
             body["search_domain_filter"] = include_domains
-        payload, meta = vendor_call(
+        payload, _ = vendor_call(
             self,
             "POST",
             PERPLEXITY_SEARCH_URL,
@@ -1337,10 +1174,7 @@ class PerplexitySearch:
             json_body=body,
             timeout=SEARCH_TIMEOUT_S,
         )
-        hits = parse_perplexity_hits(payload, max_results=max_results)
-        self.last_meta = _search_meta(meta, hits)
-        _record_site_lift(self, query if isinstance(query, str) else " | ".join(query), include_domains)
-        return hits
+        return parse_perplexity_hits(payload, max_results=max_results)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         del url, objective
@@ -1393,7 +1227,6 @@ class PerplexityFastTool(PerplexityWebTool):
     (perplexity-fast-search.md:21-24)."""
 
     name = "perplexity_fast_tool"
-    billed_sku = "perplexity_fast"
     search_type = "fast"
 
 
@@ -1468,13 +1301,10 @@ class KeenableSearch(IntentTool):
             timeout=SEARCH_TIMEOUT_S,
         )
         data = payload if isinstance(payload, dict) else {}
-        meta = {**meta, "served_mode": data.get("mode"), **{k: data[k] for k in ("usage", "warning") if k in data}}
         if data.get("mode") != self.mode:
             self.last_meta = {**meta, "served_mode_mismatch": True}
             raise RuntimeError(f"{self.name} sent mode {self.mode!r}; Keenable served {data.get('mode')!r}")
-        hits = parse_keenable_hits(payload, max_results=max_results)
-        self.last_meta = _search_meta(meta, hits)
-        return hits
+        return parse_keenable_hits(payload, max_results=max_results)
 
     def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
         del url, objective
@@ -1494,7 +1324,6 @@ class KeenableProSnippet4000(KeenableSearch):
     is the 32,000-character preview."""
 
     name = "keenable_pro_snippet4000"
-    billed_sku = "keenable_pro"
     snippet_max_length = 4000
 
 
@@ -1571,11 +1400,6 @@ def parse_parallel_extract(
         "url": str(item.get("url") or url),
         "title": str(item.get("title") or ""),
         "content": raw[:max_chars],
-        "_truncated": len(raw) > max_chars,
-        "_extract_id": str((payload or {}).get("extract_id") or ""),
-        "_session_id": str((payload or {}).get("session_id") or ""),
-        "_had_full_content": bool(item.get("full_content")),
-        "_n_excerpts": len(excerpts),
     }
 
 
@@ -1598,8 +1422,6 @@ def parse_firecrawl_scrape(
         "url": str(meta.get("sourceURL") or meta.get("url") or data.get("url") or url),
         "title": str(meta.get("title") or data.get("title") or ""),
         "content": content[:max_chars],
-        "_truncated": len(content) > max_chars,
-        "_status_code": meta.get("statusCode") or meta.get("status_code"),
     }
 
 
@@ -1613,26 +1435,12 @@ def join_preview(parts: list[str]) -> str:
     return "\n".join(kept)
 
 
-def hit_text_stats(hits: list[dict[str, str]]) -> dict[str, int]:
-    """Chars and ~tokens of title+url+snippet actually fed back to the model."""
-    chars = 0
-    for hit in hits:
-        chars += len(str(hit.get("url") or ""))
-        chars += len(str(hit.get("title") or ""))
-        chars += len(str(hit.get("snippet") or ""))
-    return {
-        "n_hits": len(hits),
-        "chars": chars,
-        "tokens_est": chars // 4,
-    }
-
-
-def fit_search_budget(hits: list[dict[str, str]]) -> tuple[list[dict[str, str]], int]:
+def fit_search_budget(hits: list[dict[str, str]]) -> list[dict[str, str]]:
     """Hits as the agent sees them under SEARCH_PREVIEW_BUDGET_CHARS, the same for every vendor.
 
     Every hit's url + title is reserved first, so no returned result disappears; the rest of the budget fills
     previews in API order, and the hit that overflows keeps its preview cut there. Hits whose url + title alone
-    exceed what is left are dropped from the end. Returns the shown hits and the number of characters cut.
+    exceed what is left are dropped from the end.
     """
     kept_hits: list[dict[str, str]] = []
     left = SEARCH_PREVIEW_BUDGET_CHARS
@@ -1647,15 +1455,7 @@ def fit_search_budget(hits: list[dict[str, str]]) -> tuple[list[dict[str, str]],
         snippet = str(hit.get("snippet") or "")[:left]
         left -= len(snippet)
         shown.append({**hit, "snippet": snippet})
-    return shown, hit_text_stats(hits)["chars"] - hit_text_stats(shown)["chars"]
-
-
-def page_text_stats(page: dict[str, str]) -> dict[str, int]:
-    return hit_text_stats([{
-        "url": str(page.get("url") or ""),
-        "title": str(page.get("title") or ""),
-        "snippet": str(page.get("content") or ""),
-    }])
+    return shown
 
 
 def parse_exa_hits(payload: Any, *, max_results: int = DEFAULT_MAX_RESULTS) -> list[dict[str, str]]:
@@ -1701,7 +1501,6 @@ def parse_exa_contents(
         "url": str(item.get("url") or url),
         "title": str(item.get("title") or ""),
         "content": content[:max_chars],
-        "_truncated": len(content) > max_chars,
     }
 
 
@@ -1739,7 +1538,6 @@ def parse_linkup_fetch(
         "url": url,
         "title": str(data.get("title") or ""),
         "content": content[:max_chars],
-        "_truncated": len(content) > max_chars,
     }
 
 
@@ -1902,7 +1700,6 @@ def parse_you_contents(
         "url": str(item.get("url") or url),
         "title": str(item.get("title") or ""),
         "content": content[:max_chars],
-        "_truncated": len(content) > max_chars,
     }
 
 
@@ -1954,7 +1751,6 @@ def parse_tinyfish_fetch(
         "url": str(item.get("final_url") or item.get("url") or url),
         "title": str(item.get("title") or ""),
         "content": content[:max_chars],
-        "_truncated": len(content) > max_chars,
     }
 
 
@@ -2054,14 +1850,10 @@ def parse_tavily_extract(
     content = str(item.get("raw_content") or item.get("content") or "")
     if not content:
         raise RuntimeError(f"{url}: extract returned no content")
-    usage = (payload or {}).get("usage") if isinstance((payload or {}).get("usage"), dict) else {}
     return {
         "url": str(item.get("url") or url),
         "title": str(item.get("title") or ""),
         "content": content[:max_chars],
-        "_truncated": len(content) > max_chars,
-        "_credits": usage.get("credits"),
-        "_request_id": str((payload or {}).get("request_id") or ""),
     }
 
 
@@ -2074,14 +1866,7 @@ def vendor_request(
     json_body: dict[str, Any] | None = None,
     params: dict[str, Any] | None = None,
 ) -> tuple[Any, dict[str, Any]]:
-    request_audit = {
-        "method": method,
-        "url": url,
-        "headers": redact_headers(headers),
-        "params": redact_payload(params),
-        "json": redact_payload(json_body),
-    }
-    record = begin_request("vendor", request_audit)
+    request = {"method": method, "url": url}
     started = time.perf_counter()
     try:
         response = requests.request(
@@ -2093,17 +1878,11 @@ def vendor_request(
             timeout=timeout,
         )
     except Exception as exc:  # noqa: BLE001
-        end_request(record, {"state": "unknown", "reason": "response unavailable"})
         meta = {
             "endpoint": url,
-            "method": method,
             "http_status": None,
             "http_ms": int((time.perf_counter() - started) * 1000),
-            "response_bytes": 0,
-            "vendor_request_id": "",
-            "error": f"{type(exc).__name__}: {exc}",
-            "request": request_audit,
-            "response": None,
+            "request": request,
         }
         error = RuntimeError(f"{type(exc).__name__}: {exc}")
         setattr(error, "vendor_meta", meta)
@@ -2116,64 +1895,23 @@ def vendor_request(
         payload = {"raw": response.text or ""}
     meta: dict[str, Any] = {
         "endpoint": url,
-        "method": method,
         "http_status": response.status_code,
         "http_ms": int((time.perf_counter() - started) * 1000),
-        "response_bytes": len(response.content or b""),
-        "vendor_request_id": _header_id(response),
-        "request": request_audit,
-        "response": {
-            "http_status": response.status_code,
-            "headers": redact_headers(dict(response.headers)),
-            "body": payload,
-        },
+        "request": request,
+        "response": {"headers": dict(response.headers)},
     }
-    end_request(record, {"state": "response", **meta["response"]})
     if decode_error and response.ok:
         error = ValueError("vendor returned a non-JSON response")
         setattr(error, "vendor_meta", meta)
         raise error
-    if isinstance(payload, dict):
-        for key in ("extract_id", "search_id", "id", "session_id", "request_id", "requestId"):
-            if payload.get(key):
-                meta[key] = str(payload[key])
-        if payload.get("requestId"):
-            meta["vendor_request_id"] = str(payload["requestId"])
-        if url == EXA_SEARCH_URL and isinstance(payload.get("notices"), list):
-            meta["notices"] = payload["notices"]
+    if url == EXA_SEARCH_URL and isinstance(payload, dict) and isinstance(payload.get("notices"), list):
+        meta["notices"] = payload["notices"]
     if not response.ok:
         meta["error_body"] = str(payload)[:800]
         error = requests.HTTPError(f"{response.status_code} for {url}", response=response)
         setattr(error, "vendor_meta", meta)
         raise error
     return payload, meta
-
-
-def redact_headers(headers: dict[str, str] | None) -> dict[str, str]:
-    out: dict[str, str] = {}
-    for key, value in (headers or {}).items():
-        lowered = str(key).lower()
-        if any(token in lowered for token in HEADER_REDACT_TOKENS):
-            out[str(key)] = "***REDACTED***"
-        else:
-            out[str(key)] = str(value)
-    return out
-
-
-def redact_payload(value: Any) -> Any:
-    if isinstance(value, dict):
-        out: dict[str, Any] = {}
-        for key, item in value.items():
-            name = str(key).lower().replace("-", "_")
-            credential = name in {"authorization", "api_key", "apikey", "token", "secret", "password", "cookie"}
-            if credential or name.endswith(("_api_key", "_token", "_secret", "_password")):
-                out[str(key)] = "***REDACTED***"
-            else:
-                out[str(key)] = redact_payload(item)
-        return out
-    if isinstance(value, list):
-        return [redact_payload(item) for item in value]
-    return value
 
 
 def classify_failure(meta: dict[str, Any], error: str | None) -> str | None:
@@ -2237,90 +1975,10 @@ def vendor_call(backend: Any, *args: Any, **kwargs: Any) -> tuple[Any, dict[str,
     return payload, meta
 
 
-def _header_id(response: Any) -> str:
-    headers = getattr(response, "headers", None) or {}
-    for key in ("x-request-id", "x-parallel-request-id", "cf-ray", "fly-request-id"):
-        value = headers.get(key)
-        if value:
-            return str(value)
-    return ""
-
-
-def _search_meta(meta: dict[str, Any], hits: list[dict[str, str]]) -> dict[str, Any]:
-    urls = [str(hit.get("url") or "") for hit in hits if hit.get("url")]
-    return {
-        **meta,
-        "n_hits": len(hits),
-        "hit_urls": urls,
-        "empty": len(hits) == 0,
-    }
-
-
-def _pop_flags(page: dict[str, Any]) -> dict[str, Any]:
-    flags: dict[str, Any] = {}
-    for key in list(page):
-        if key.startswith("_") and key != "_meta":
-            flags[key[1:]] = page.pop(key)
-    return flags
-
-
-# Canonical ids. Aliases below keep old CLI names working.
-SEARCH_ONLY_BACKENDS: tuple[str, ...] = (
-    "parallel_fast_tool",
-    "parallel_advanced_tool",
-    "exa_auto",
-    "exa_auto_domains",
-    "tavily_advanced",
-    "tavily_basic",
-    "linkup_standard",
-    "linkup_fast",
-    "tinyfish",
-    "tinyfish_no_purpose",
-    "brave",
-    "brave_tokens_6100",
-    "you_highlights_core",
-    "you_highlights",
-    "firecrawl",
-    "firecrawl_domains",
-    "keenable_pro",
-    "keenable_realtime",
-    "nimble_standard",
-    "nimble_lite_coding",
-    "perplexity_web_tool",
-    "perplexity_fast_tool",
-    "tako",
-    "tako_plain",
-    "serp",
-    "serp_en_us",
-)
-SEARCH_FETCH_BACKENDS: tuple[str, ...] = (
-    "nimble_standard",
-    "exa_auto",
-    "tavily_basic",
-    "tavily_advanced",
-    "linkup_standard",
-    "firecrawl",
-    "you_highlights",
-    "you_highlights_core",
-    "tinyfish",
-)
-BACKEND_ALIASES = {
-    "exa": "exa_auto",
-    "tavily": "tavily_advanced",
-    "linkup": "linkup_standard",
-}
-BACKEND_ALIAS_SPLIT = {alias: "search-only" for alias in BACKEND_ALIASES}
-# Search-only exclusive rows cannot turn fetch on. Search+fetch exclusive rows
-# cannot turn fetch off. Dual-split vendors sit on both boards.
-DUAL_SPLIT_BACKENDS = frozenset({"nimble_standard", "tavily_basic", "tavily_advanced", "exa_auto", "firecrawl", "you_highlights", "you_highlights_core", "tinyfish", "linkup_standard"})
-FETCH_FORBIDDEN = frozenset(SEARCH_ONLY_BACKENDS) - DUAL_SPLIT_BACKENDS
-FETCH_REQUIRED = frozenset(SEARCH_FETCH_BACKENDS) - DUAL_SPLIT_BACKENDS
-
 BACKENDS: dict[str, Callable[[], SearchBackend]] = {
     "nimble_lite": NimbleLite,
     "nimble_standard": NimbleStandard,
     "nimble_lite_coding": NimbleLiteCoding,
-    "no_search": NoSearch,
     "parallel_fast": ParallelFast,
     "parallel_fast_raw": ParallelFastRaw,
     "parallel_fast_tool": ParallelFastTool,
@@ -2359,14 +2017,8 @@ BACKENDS: dict[str, Callable[[], SearchBackend]] = {
 }
 
 
-def resolve_backend(name: str) -> str:
-    return BACKEND_ALIASES.get(name, name)
-
-
 def get_backend(name: str) -> SearchBackend:
-    canonical = resolve_backend(name)
-    factory = BACKENDS.get(canonical)
+    factory = BACKENDS.get(name)
     if factory is None:
-        known = ", ".join(sorted(set(resolve_backend(item) for item in BACKENDS)))
-        raise KeyError(f"unknown search backend {name!r}; wired now: {known}")
+        raise KeyError(f"unknown search backend {name!r}; wired now: {', '.join(sorted(BACKENDS))}")
     return factory()

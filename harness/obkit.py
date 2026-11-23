@@ -1,4 +1,5 @@
-"""obkit entry points: answer one question with one setup, what the model sees, and what each setup sends."""
+"""obkit entry points: answer one question with one setup, what the model sees, what each setup sends, and the offline
+selftest (`python -B -m harness.obkit data/questions.jsonl`)."""
 
 from __future__ import annotations
 
@@ -9,7 +10,6 @@ import json
 import os
 import re
 import sys
-import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
@@ -19,10 +19,11 @@ from judge import checks as facts
 
 from . import agent
 from . import search as vendors
-from .run import CodingTask, load_environment, load_tasks, make_llm_client
 
 HERE = Path(__file__).resolve().parent
 CONFIG = yaml.safe_load((HERE / "config.yaml").read_text())
+AZURE_KEY_ENV = "AZURE_OPENAI_NEXTGEN_DEPLOYMENT_KEY"
+AZURE_URL_ENV = "AZURE_OPENAI_NEXTGEN_DEPLOYMENT_URL"
 CANNED_PASS_PERCENT = {"no_search": 30, "exa_fast": 75, "parallel_fast": 60}
 CANNED_FACTS = {
     "llm_cost_usd": 0.0,
@@ -38,18 +39,11 @@ PROBE_URL = "https://example.com/obkit-probe"
 PROBE_HITS = [
     {"url": f"https://example.com/{i}", "title": f"title {i}", "snippet": "snippet " * 400} for i in range(12)
 ]
-PROBE_PAGE = {"requested_url": PROBE_URL, "final_url": PROBE_URL, "title": "probe", "text": "page " * 9000}
+PROBE_PAGE = {"url": PROBE_URL, "title": "probe", "content": "page " * 9000}
 
 
 class _Sent(Exception):
     """Raised where a request would leave this machine."""
-
-
-def _task(row: dict) -> CodingTask:
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl") as f:
-        f.write(json.dumps(row) + "\n")
-        f.flush()
-        return load_tasks(Path(f.name))[0]
 
 
 def _arms() -> dict[str, tuple[str, str]]:
@@ -107,7 +101,7 @@ class _FirstTurn:
 
 def _shaping() -> list:
     """The tool outputs the model would read for fixed search and fetch results, and the budget messages."""
-    run = agent.AgentRun(question="", answer="", model="", backend="probe", used_search=False)
+    run = agent.AgentRun()
     conversation: list = []
     search_call = {"call_id": "s", "name": "web_search", "arguments": json.dumps({"query": PROBE_QUERY})}
     fetch_call = {"call_id": "f", "name": "web_fetch", "arguments": json.dumps({"url": PROBE_URL, "objective": ""})}
@@ -121,8 +115,6 @@ def _shaping() -> list:
             max_searches=left,
             max_results=CONFIG["limits"]["results_per_search"],
             search_fn=lambda q: [dict(h) for h in PROBE_HITS],
-            turn=0,
-            leak_needles=[],
         )
     for left in (1, 0):
         agent._run_fetch(
@@ -130,10 +122,8 @@ def _shaping() -> list:
             run=run,
             conversation=conversation,
             backend=None,
-            provider="probe",
             max_fetches=left,
             fetch_fn=lambda u, o: dict(PROBE_PAGE),
-            turn=0,
         )
     return conversation
 
@@ -142,7 +132,7 @@ def contract(questions: list[dict]) -> dict:
     """What the model sees: the first request of every question in every mode, and the tool-output shaping."""
 
     def first_turns(row: dict) -> dict:
-        text = facts.question(_task(row))
+        text = facts.question(row)
         out = {}
         for mode in ("search_fetch", "search_only", "no_search"):
             client = _FirstTurn()
@@ -305,20 +295,40 @@ def _price(setup: str) -> dict:
     return {}
 
 
+def load_environment() -> None:
+    path = HERE.parent / ".env"
+    if path.is_file():
+        from dotenv import load_dotenv
+
+        load_dotenv(path)
+
+
+def make_llm_client(*, timeout: float, max_retries: int):
+    """Azure Foundry OpenAI-v1 deployment when NEXTGEN env is set, else native OpenAI."""
+    from openai import OpenAI
+
+    azure_url = (os.environ.get(AZURE_URL_ENV) or "").rstrip("/")
+    azure_key = os.environ.get(AZURE_KEY_ENV) or ""
+    if azure_url and azure_key:
+        return OpenAI(base_url=azure_url, api_key=azure_key, timeout=timeout, max_retries=max_retries)
+    key = os.environ.get("OPENAI_API_KEY") or ""
+    if not key:
+        raise SystemExit(f"set {AZURE_URL_ENV} + {AZURE_KEY_ENV} (preferred) or OPENAI_API_KEY")
+    return OpenAI(api_key=key, timeout=timeout, max_retries=max_retries)
+
+
 def answer(question: dict, setup: str, *, dry: bool, tracer=None) -> dict:
     if dry:
         return _canned(question, setup)
     load_environment()
-    task = _task(question)
     search, fetch, system = _mode(setup)
     run = _run(
-        facts.question(task),
+        facts.question(question),
         ARMS[setup][0],
         search,
         fetch,
         system,
         make_llm_client(timeout=180, max_retries=1),
-        leak_needles=task.leak_needles(),
     )
     if tracer is not None:
         for turn in run.llm_turns:
@@ -344,13 +354,12 @@ def answer(question: dict, setup: str, *, dry: bool, tracer=None) -> dict:
     per_mtok = CONFIG["usd_per_mtok"]
     vendor_cost = billed * float(price.get("list_usd") or 0) + fetched * float(price.get("fetch_usd") or 0)
     llm_cost = (run.llm_prompt_tokens * per_mtok["input"] + run.llm_completion_tokens * per_mtok["output"]) / 1e6
-    metrics = run.metrics()
     cost_facts = {
         "llm_cost_usd": round(llm_cost, 6),
         "vendor_cost_usd": round(vendor_cost, 6),
-        "llm_ms": metrics["llm_ms"],
-        "search_ms": metrics["search_ms"],
-        "fetch_ms": metrics["fetch_ms"],
+        "llm_ms": run.llm_ms,
+        "search_ms": sum(call.latency_ms for call in run.searches),
+        "fetch_ms": sum(call.latency_ms for call in run.fetches),
         "input_tokens": run.llm_prompt_tokens,
         "output_tokens": run.llm_completion_tokens,
     }
@@ -370,3 +379,34 @@ def answer(question: dict, setup: str, *, dry: bool, tracer=None) -> dict:
         "cost_usd": round(llm_cost + vendor_cost, 6),
         "facts": cost_facts,
     }
+
+
+def _sent_call(request: dict) -> dict:
+    """A request the stand-in recorded, written as an agent's answer."""
+    query = "&".join(f"{name}={value}" for name, value in (request.get("query") or {}).items())
+    return {"method": request["method"].upper(), "path": request["path"] + (f"?{query}" if query else ""),
+            "operation": request.get("soap") or "", "fields": request.get("body_keys") or []}
+
+
+def selftest(path: Path) -> int:
+    """Offline: every question's reference fix sends a request the answer grader accepts, its starter one the grader
+    refuses (unless the row names a known issue), and every setup's backend builds."""
+    rows = [json.loads(line) for line in path.read_text().split("\n") if line.strip()]
+    failed = 0
+    for row in rows:
+        accepted = row["retrieval_key"]["accepted"]
+        for which, passes in (("gold", True), ("starter", row.get("known_issue") is not None)):
+            sent = facts.recorded(row, which)["requests"]
+            if not sent or facts.grade(accepted, _sent_call(sent[0])) != passes:
+                failed += 1
+                print(f"FAIL {row['task_id']} {which}: {'accepted' if not passes else 'refused'} or sent nothing")
+    backends = sorted({backend for backend, _ in ARMS.values() if backend != "no_search"})
+    for backend in backends:
+        vendors.get_backend(backend)
+    print(f"questions {len(rows)}: reference fixes and starters graded as expected, {failed} failed")
+    print(f"setups {len(ARMS)}: {len(backends)} search backends build")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(selftest(Path(sys.argv[1])))
