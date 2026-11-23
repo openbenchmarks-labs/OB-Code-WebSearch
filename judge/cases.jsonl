@@ -17,3 +17,5 @@
 {"set": "public", "question": "hard_sn_dcim_metric_feed", "answer": "{\"method\": \"POST\", \"path\": \"/api/sn_ni_adv/dcim/feed/{vendor}\", \"operation\": \"\", \"fields\": []}", "expected": true, "kind": "planted"}
 {"set": "public", "question": "hard_sn_dcim_metric_feed", "answer": "{\"method\": \"DELETE\", \"path\": \"/api/sn_ni_adv/dcim/feed/{vendor}\", \"operation\": \"\", \"fields\": []}", "expected": false, "kind": "planted"}
 {"set": "public", "question": "hard_gen_search_developer_reference", "answer": "I could not find it.", "expected": false, "kind": "planted"}
+{"set": "public", "question": "hard_sn_process_script_debug_points", "answer": "{\"method\": \"POST\", \"path\": \"/api/now/js/debugpoints/process\", \"operation\": \"\", \"fields\": [\"scriptId\"]}", "expected": true, "kind": "planted"}
+{"set": "public", "question": "hard_sn_process_script_debug_points", "answer": "{\"method\": \"POST\", \"path\": \"/api/now/js/debugpoints/process\", \"operation\": \"\", \"fields\": []}", "expected": false, "kind": "planted"}

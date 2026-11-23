@@ -14,7 +14,7 @@ from pathlib import Path
 
 import yaml
 
-from .checks import grade as grade_call
+from .checks import asked_by_answer, grade_task
 
 HERE = Path(__file__).resolve().parent
 PROMPT = (HERE / "verifier_prompt.txt").read_text()
@@ -23,7 +23,7 @@ VERDICTS = {"PASS": True, "FAIL": False}
 
 
 def grade(question: dict, answer: str) -> bool:
-    return grade_call(question["retrieval_key"]["accepted"], answer)
+    return grade_task(question, answer)
 
 
 def _read(reader: dict, user: str) -> tuple[str, float]:
@@ -74,9 +74,12 @@ def verify(question: dict, answer: str, passed: bool, *, dry: bool) -> dict:
     from harness.obkit import load_environment
 
     load_environment()
+    accepted = question["retrieval_key"]["accepted"]
+    asked = asked_by_answer(question, accepted)
     right = "\n".join(
         f"{r['method']} {r['address']}" + (f" (SOAP {r['soap']})" if r.get("soap") else "")
-        for r in question["retrieval_key"]["accepted"]
+        + (f" (fields: {', '.join(asked[i])})" if asked.get(i) else "")
+        for i, r in enumerate(accepted)
     )
     user = f"Task:\n{question['ticket']}\n\nRight answers:\n{right}\n\nAgent's call:\n{answer}"
     cost = 0.0
