@@ -162,7 +162,10 @@ def probe(setup: str) -> dict:
         sent.append({"method": method, "url": url, "headers": sorted(kwargs.pop("headers", None) or {}), **kwargs})
         raise _Sent
 
-    names = set(re.findall(r'os\.environ\.get\("([A-Z0-9_]+)"', (HERE / "search.py").read_text()))
+    source = (HERE / "search.py").read_text()
+    names = set(re.findall(r'os\.environ\.get\("([A-Z0-9_]+)"', source))
+    for args in re.findall(r"_first_env\(([^)]*)\)", source):
+        names |= set(re.findall(r'"([A-Z0-9_]+)"', args))
     backend = vendors.get_backend(ARMS[setup][0])
     with (
         mock.patch.object(vendors, "vendor_request", record),
