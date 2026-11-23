@@ -1,30 +1,21 @@
-"""Coding-agent loop with web search and fetch tools. Gold tokens in queries are flagged, not blocked."""
+"""Agent loop with web search and fetch tools."""
 
 from __future__ import annotations
 
 import json
 import time
-import uuid
 from collections.abc import Callable
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
+from dataclasses import dataclass, field
 from typing import Any
 
-from .logger import request_scope, write_hop_pair, write_json
 from .search import (
-    DEFAULT_MAX_RESULTS,
     QUERY_PARAMETER,
     UNSCORED_FAILURES,
     SearchBackend,
     classify_failure,
     fit_search_budget,
     get_backend,
-    hit_text_stats,
-    page_text_stats,
 )
-
-DEFAULT_MODEL = "gpt-6-sol"
-REASONING_EFFORT = "medium"
 
 WEB_SEARCH_TOOL = {
     "type": "function",
@@ -70,213 +61,69 @@ WEB_FETCH_TOOL = {
 @dataclass
 class SearchCall:
     query: str
-    backend: str
-    hits: list[dict[str, str]]
-    error: str | None = None
-    latency_ms: int = 0
-    n_hits: int = 0
-    chars: int = 0
-    tokens_est: int = 0
-    turn: int = 0
-    seq: int = 0
-    endpoint: str = ""
-    http_status: int | None = None
-    http_ms: int | None = None
-    vendor_request_id: str = ""
-    hit_urls: list[str] = field(default_factory=list)
-    empty: bool = False
-    gold_token: str | None = None
-    budget_cut_chars: int = 0
-    request: dict[str, Any] | None = None
-    response: dict[str, Any] | None = None
-    # Set only under the "counts only when it returned a result" budget rule: whether this call used one of the searches.
-    counted: bool | None = None
+    error: str | None
+    latency_ms: int
+    n_hits: int
+    http_status: int | None
+    hit_urls: list[str]
     # Queries the request carried: each one is one of the max_searches when the request returns a result.
-    n_queries: int = 1
-    failure_class: str | None = None
-    request_attempted: bool = False
-    notices: list[dict[str, Any]] = field(default_factory=list)
-
-    def hop_dict(self) -> dict[str, Any]:
-        return {
-            "query": self.query,
-            "backend": self.backend,
-            "n_hits": self.n_hits,
-            "chars": self.chars,
-            "tokens_est": self.tokens_est,
-            "latency_ms": self.latency_ms,
-            "http_ms": self.http_ms,
-            "http_status": self.http_status,
-            "endpoint": self.endpoint,
-            "vendor_request_id": self.vendor_request_id,
-            "hit_urls": self.hit_urls,
-            "empty": self.empty,
-            "error": self.error,
-            "failure_class": self.failure_class,
-            "request_attempted": self.request_attempted,
-            "notices": self.notices,
-            "gold_token": self.gold_token,
-            "budget_cut_chars": self.budget_cut_chars,
-            "n_queries": self.n_queries,
-            "turn": self.turn,
-            "seq": self.seq,
-            "hits": [
-                {
-                    "url": str(hit.get("url") or ""),
-                    "title": str(hit.get("title") or ""),
-                    "snippet": str(hit.get("snippet") or ""),
-                }
-                for hit in (self.hits or [])
-                if isinstance(hit, dict)
-            ],
-            **({"counted": self.counted} if self.counted is not None else {}),
-        }
+    n_queries: int
+    failure_class: str | None
+    request_attempted: bool
+    notices: list[dict[str, Any]]
 
 
 @dataclass
 class FetchCall:
     url: str
-    backend: str
-    title: str = ""
-    content: str = ""
-    objective: str = ""
-    error: str | None = None
-    latency_ms: int = 0
-    chars: int = 0
-    tokens_est: int = 0
-    turn: int = 0
-    seq: int = 0
-    endpoint: str = ""
-    http_status: int | None = None
-    http_ms: int | None = None
-    vendor_request_id: str = ""
-    preview: str = ""
-    request: dict[str, Any] | None = None
-    response: dict[str, Any] | None = None
-    failure_class: str | None = None
-    request_attempted: bool = False
-
-    def hop_dict(self) -> dict[str, Any]:
-        return {
-            "url": self.url,
-            "backend": self.backend,
-            "title": self.title,
-            "objective": self.objective,
-            "chars": self.chars,
-            "tokens_est": self.tokens_est,
-            "latency_ms": self.latency_ms,
-            "http_ms": self.http_ms,
-            "http_status": self.http_status,
-            "endpoint": self.endpoint,
-            "vendor_request_id": self.vendor_request_id,
-            "error": self.error,
-            "failure_class": self.failure_class,
-            "request_attempted": self.request_attempted,
-            "turn": self.turn,
-            "seq": self.seq,
-            "preview": (self.preview or self.content or "")[:800],
-            "content": self.content,
-        }
+    error: str | None
+    latency_ms: int
+    http_status: int | None
+    failure_class: str | None
+    request_attempted: bool
 
 
 @dataclass
 class LlmTurn:
-    turn: int
     latency_ms: int
     prompt_tokens: int
     completion_tokens: int
-    n_tool_calls: int
     tool_names: list[str] = field(default_factory=list)
-    ended: bool = False
-    error: str | None = None
-    usage_available: bool = True
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 @dataclass
 class AgentRun:
-    question: str
-    answer: str
-    model: str
-    backend: str
-    used_search: bool
-    used_fetch: bool = False
-    run_id: str = ""
+    answer: str = ""
     searches: list[SearchCall] = field(default_factory=list)
     fetches: list[FetchCall] = field(default_factory=list)
     llm_turns: list[LlmTurn] = field(default_factory=list)
-    notes: list[str] = field(default_factory=list)
-    wall_ms: int = 0
     llm_ms: int = 0
     llm_prompt_tokens: int = 0
     llm_completion_tokens: int = 0
-    hop_seq: int = 0
     error: str | None = None
-    failure_origin: str | None = None
-    evidence_dir: Path | None = None
-
-    def metrics(self) -> dict[str, Any]:
-        return {
-            "wall_ms": self.wall_ms,
-            "llm_ms": self.llm_ms,
-            "search_count": sum(call.request_attempted for call in self.searches),
-            # The cost column's inputs: each successful search is billed, an empty one only where the vendor
-            # bills empty results (`bills_empty` in tools/*.yaml); failed calls cost 0 for every vendor.
-            "successful_search_count": sum(1 for call in self.searches if call.request_attempted and not call.error),
-            "empty_search_count": sum(
-                1 for call in self.searches if call.request_attempted and not call.error and call.n_hits == 0),
-            "fetch_count": sum(call.request_attempted for call in self.fetches),
-            "search_tool_call_count": len(self.searches),
-            "fetch_tool_call_count": len(self.fetches),
-            "counted_searches": sum(call.n_queries for call in self.searches if call.counted is not False),
-            "model_call_count": len(self.llm_turns),
-            "model_usage_complete": all(turn.usage_available for turn in self.llm_turns),
-            "search_ms": sum(call.latency_ms for call in self.searches),
-            "fetch_ms": sum(call.latency_ms for call in self.fetches),
-            "llm_prompt_tokens": self.llm_prompt_tokens,
-            "llm_completion_tokens": self.llm_completion_tokens,
-            "gold_token_queries": sum(1 for call in self.searches if call.gold_token),
-        }
 
 
 def run_agent(
     question: str,
     *,
     client: Any,
-    backend: SearchBackend | None = None,
-    backend_name: str = "parallel_fast_tool",
-    model: str = DEFAULT_MODEL,
-    reasoning_effort: str = REASONING_EFFORT,
-    max_turns: int = 32,
-    max_searches: int = 5,
-    max_fetches: int = 0,
-    max_results: int = DEFAULT_MAX_RESULTS,
+    backend_name: str,
+    model: str,
+    reasoning_effort: str,
+    max_turns: int,
+    max_searches: int,
+    max_fetches: int,
+    max_results: int,
+    system: str,
+    allow_search: bool,
+    allow_fetch: bool,
+    text_format: dict[str, Any],
     search_fn: Callable[[str], list[dict[str, str]]] | None = None,
     fetch_fn: Callable[[str, str], dict[str, str]] | None = None,
-    system: str,
-    allow_search: bool = True,
-    allow_fetch: bool = True,
-    leak_needles: list[str] | None = None,
-    text_format: dict[str, Any] | None = None,
-    evidence_root: Path | None = None,
 ) -> AgentRun:
-    backend = backend or (None if search_fn else get_backend(backend_name))
+    backend = get_backend(backend_name) if allow_search and not search_fn else None
     provider = backend.name if backend is not None else backend_name
-    if not allow_search:
-        provider = "no_search"
-    run = AgentRun(
-        question=question,
-        answer="",
-        model=model,
-        backend=provider,
-        used_search=False,
-        run_id=uuid.uuid4().hex,
-    )
-    if evidence_root is not None:
-        run.evidence_dir = evidence_root / run.run_id
-        run.evidence_dir.mkdir(parents=True, exist_ok=False)
+    run = AgentRun()
     conversation: list[dict[str, Any]] = [
         {"role": "system", "content": system},
         {"role": "user", "content": question},
@@ -289,7 +136,6 @@ def run_agent(
     # Every lane: each search call takes a turn, including separate calls in one model response, so empty or failed
     # searches, which do not use one of the max_searches, are still capped by max_turns.
     extra_search_turns = 0
-    started = time.perf_counter()
     for model_turn in range(max_turns):
         turn = model_turn + extra_search_turns
         if turn >= max_turns:
@@ -298,27 +144,15 @@ def run_agent(
         request = {
             "model": model, "reasoning": {"effort": reasoning_effort},
             "tools": tools, "input": conversation, "max_output_tokens": 4000, "store": False,
-            **({"text": {"format": text_format}} if text_format else {}),
+            "text": {"format": text_format},
         }
-        if run.evidence_dir is not None:
-            write_json(run.evidence_dir / "model" / f"{model_turn + 1:02d}.request.json", request)
         try:
-            with request_scope(run.evidence_dir):
-                response = client.responses.create(**request)
-            if run.evidence_dir is not None:
-                payload = response.model_dump(mode="json") if hasattr(response, "model_dump") else vars(response)
-                write_json(run.evidence_dir / "model" / f"{model_turn + 1:02d}.response.json", payload)
-        except Exception as exc:  # Preserve completed evidence when the model service fails.
+            response = client.responses.create(**request)
+        except Exception as exc:  # noqa: BLE001
             llm_ms = int((time.perf_counter() - llm_started) * 1000)
             run.llm_ms += llm_ms
             run.error = f"{type(exc).__name__}: {exc}"
-            run.failure_origin = _model_failure_origin(exc)
-            if run.evidence_dir is not None:
-                write_json(run.evidence_dir / "model" / f"{model_turn + 1:02d}.error.json",
-                           {"error": run.error, "failure_origin": run.failure_origin})
-            run.llm_turns.append(LlmTurn(turn=turn, latency_ms=llm_ms, prompt_tokens=0,
-                                        completion_tokens=0, n_tool_calls=0, ended=True,
-                                        error=run.error, usage_available=False))
+            run.llm_turns.append(LlmTurn(latency_ms=llm_ms, prompt_tokens=0, completion_tokens=0))
             break
         llm_ms = int((time.perf_counter() - llm_started) * 1000)
         prompt_tokens, completion_tokens = _usage(response)
@@ -328,19 +162,14 @@ def run_agent(
         calls = _function_calls(response)
         run.llm_turns.append(
             LlmTurn(
-                turn=turn,
                 latency_ms=llm_ms,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                n_tool_calls=len(calls),
                 tool_names=[_call_name(call) for call in calls],
-                ended=not calls,
-                usage_available=getattr(response, "usage", None) is not None,
             )
         )
         if not calls:
             run.answer = (getattr(response, "output_text", None) or "").strip()
-            run.wall_ms = int((time.perf_counter() - started) * 1000)
             return run
         _append_model_output(conversation, response)
         search_calls_this_response = 0
@@ -353,7 +182,6 @@ def run_agent(
                 if search_calls_this_response:
                     if turn + 1 >= max_turns:
                         conversation.append(_tool_output(call, {"error": "turn budget exhausted; answer now"}))
-                        run.notes.append("turn budget exhausted")
                         continue
                     turn += 1
                     extra_search_turns += 1
@@ -367,8 +195,6 @@ def run_agent(
                     max_searches=max_searches,
                     max_results=max_results,
                     search_fn=search_fn,
-                    turn=turn,
-                    leak_needles=leak_needles,
                     client_model=model,
                 )
             elif name == "web_fetch":
@@ -380,10 +206,8 @@ def run_agent(
                     run=run,
                     conversation=conversation,
                     backend=backend,
-                    provider=provider,
                     max_fetches=max_fetches,
                     fetch_fn=fetch_fn,
-                    turn=turn,
                 )
             else:
                 conversation.append(_tool_output(call, {"error": f"unknown tool {name}"}))
@@ -391,27 +215,7 @@ def run_agent(
                 break
         if run.error:
             break
-    run.notes.append("stopped after local/model failure" if run.error else "hit max turns without a final answer")
-    run.wall_ms = int((time.perf_counter() - started) * 1000)
     return run
-
-
-def _next_seq(run: AgentRun) -> int:
-    run.hop_seq += 1
-    return run.hop_seq
-
-
-def _hidden_token_in_query(query: str, needles: list[str] | None) -> str | None:
-    if not needles:
-        return None
-    hay = query.casefold()
-    for needle in needles:
-        token = (needle or "").strip()
-        if len(token) < 4:
-            continue
-        if token.casefold() in hay:
-            return token
-    return None
 
 
 def _vendor_meta(backend: SearchBackend | None) -> dict[str, Any]:
@@ -453,8 +257,6 @@ def _run_search(
     max_searches: int,
     max_results: int,
     search_fn: Callable[[str], list[dict[str, str]]] | None,
-    turn: int,
-    leak_needles: list[str] | None,
     client_model: str = "",
 ) -> None:
     # One rule for every lane: each query is one search, so a request carrying N queries uses N of the max_searches
@@ -476,7 +278,6 @@ def _run_search(
     left = max_searches - sum(done.n_queries for done in run.searches if done.n_hits > 0)
     if left <= 0:
         conversation.append(_tool_output(call, {"error": "search budget exhausted; answer now"}))
-        run.notes.append("search budget exhausted")
         return
     budget_note = ""
     if queries_field and len(request[queries_field]) > left:
@@ -486,18 +287,14 @@ def _run_search(
     n_queries = len(request[queries_field]) if queries_field else 1
     search_started = time.perf_counter()
     meta: dict[str, Any] = {}
-    gold_token = _hidden_token_in_query(query, leak_needles)
-    if gold_token:
-        run.notes.append(f"query contained gold token:{gold_token}")
     before = getattr(backend, "last_meta", None)
     try:
-        with request_scope(run.evidence_dir):
-            if search_fn:
-                hits = search_fn(query)
-            elif tool_lane:
-                hits = backend.search_tool(request, max_results=max_results, client_model=client_model)
-            else:
-                hits = backend.search(query, max_results=max_results)
+        if search_fn:
+            hits = search_fn(query)
+        elif tool_lane:
+            hits = backend.search_tool(request, max_results=max_results, client_model=client_model)
+        else:
+            hits = backend.search(query, max_results=max_results)
         if not search_fn:
             meta = _vendor_meta(backend)
         error = None
@@ -507,42 +304,20 @@ def _run_search(
         meta = _failed_call_meta(backend, before)
     # Vendor latency is the HTTP call alone (`http_ms`), not our rate-pacing wait before it.
     latency_ms = int(meta["http_ms"] if meta.get("http_ms") is not None else (time.perf_counter() - search_started) * 1000)
-    hits, budget_cut_chars = fit_search_budget(hits)
-    stats = hit_text_stats(hits)
-    hit_urls = [str(hit.get("url") or "") for hit in hits if hit.get("url")]
+    hits = fit_search_budget(hits)
     hop = SearchCall(
         query=query,
-        backend=provider,
-        hits=hits,
         error=error,
         latency_ms=latency_ms,
-        n_hits=stats["n_hits"],
-        chars=stats["chars"],
-        tokens_est=stats["tokens_est"],
-        turn=turn,
-        seq=_next_seq(run),
-        endpoint=str(meta.get("endpoint") or ""),
+        n_hits=len(hits),
         http_status=meta.get("http_status"),
-        http_ms=meta.get("http_ms"),
-        vendor_request_id=str(meta.get("vendor_request_id") or ""),
-        hit_urls=hit_urls,
-        empty=stats["n_hits"] == 0,
-        gold_token=gold_token,
-        budget_cut_chars=budget_cut_chars,
-        request=meta.get("request") if isinstance(meta.get("request"), dict) else None,
-        response=meta.get("response") if isinstance(meta.get("response"), dict) else None,
-        counted=stats["n_hits"] > 0,
+        hit_urls=[str(hit.get("url") or "") for hit in hits if hit.get("url")],
         n_queries=n_queries,
         failure_class=classify_failure(meta, error),
         request_attempted=bool(meta.get("request")),
         notices=meta.get("notices", []),
     )
-    run.used_search = True
     run.searches.append(hop)
-    if run.evidence_dir is not None:
-        stem = f"search-{len(run.searches):02d}"
-        write_hop_pair(run.evidence_dir / "hops", stem, hop.request, hop.response)
-        write_json(run.evidence_dir / "hops" / f"{stem}.delivered.json", hop.hop_dict())
     # Exa's own tool output leads with the notices, then the results: exa_py/tools.py:32-37.
     tool_result: dict[str, Any] = {**(request if tool_lane else {"query": query}),
                                    **({"notices": hop.notices} if hop.notices else {}),
@@ -555,7 +330,7 @@ def _run_search(
         tool_result["error"] = f"search failed ({hop.failure_class}, HTTP {hop.http_status})" + (
             f": {vendor_text}" if vendor_text else "")
         if hop.failure_class in UNSCORED_FAILURES:
-            run.error, run.failure_origin = error, hop.failure_class
+            run.error = error
         if hop.failure_class == "account_billing":
             # Out of credit fails every later search of this vendor: stop the round, so no attempt is scored on it.
             raise BudgetStop(f"{provider} account out of credit (HTTP {hop.http_status})")
@@ -576,14 +351,11 @@ def _run_fetch(
     run: AgentRun,
     conversation: list[dict[str, Any]],
     backend: SearchBackend | None,
-    provider: str,
     max_fetches: int,
     fetch_fn: Callable[[str, str], dict[str, str]] | None,
-    turn: int,
 ) -> None:
     if len(run.fetches) >= max_fetches:
         conversation.append(_tool_output(call, {"error": "fetch budget exhausted; answer now"}))
-        run.notes.append("fetch budget exhausted")
         return
     args = _call_args(call)
     url = str(args.get("url") or "").strip()
@@ -592,50 +364,24 @@ def _run_fetch(
         conversation.append(_tool_output(call, {"error": "url must be http(s)"}))
         return
     fetch_started = time.perf_counter()
-    meta: dict[str, Any] = {}
     before = getattr(backend, "last_meta", None)
     try:
-        with request_scope(run.evidence_dir):
-            page = fetch_fn(url, objective) if fetch_fn else backend.fetch(url, objective=objective)
-        meta = dict(page.pop("_meta", None) or {})
-        if not meta and not fetch_fn:
-            meta = _vendor_meta(backend)
+        page = fetch_fn(url, objective) if fetch_fn else backend.fetch(url, objective=objective)
+        meta = {} if fetch_fn else _vendor_meta(backend)
         error = None
     except Exception as exc:  # noqa: BLE001
         page = {"url": url, "title": "", "content": ""}
         error = f"{type(exc).__name__}: {exc}"
         meta = _failed_call_meta(backend, before)
-    latency_ms = int((time.perf_counter() - fetch_started) * 1000)
-    stats = page_text_stats(page)
-    content = str(page.get("content") or "")
     hop = FetchCall(
         url=str(page.get("url") or url),
-        backend=provider,
-        title=str(page.get("title") or ""),
-        content=content,
-        objective=objective,
         error=error,
-        latency_ms=latency_ms,
-        chars=stats["chars"],
-        tokens_est=stats["tokens_est"],
-        turn=turn,
-        seq=_next_seq(run),
-        endpoint=str(meta.get("endpoint") or ""),
+        latency_ms=int((time.perf_counter() - fetch_started) * 1000),
         http_status=meta.get("http_status"),
-        http_ms=meta.get("http_ms"),
-        vendor_request_id=str(meta.get("vendor_request_id") or ""),
-        preview=content[:800],
-        request=meta.get("request") if isinstance(meta.get("request"), dict) else None,
-        response=meta.get("response") if isinstance(meta.get("response"), dict) else None,
         failure_class=classify_failure(meta, error),
         request_attempted=bool(meta.get("request")),
     )
-    run.used_fetch = True
     run.fetches.append(hop)
-    if run.evidence_dir is not None:
-        stem = f"fetch-{len(run.fetches):02d}"
-        write_hop_pair(run.evidence_dir / "hops", stem, hop.request, hop.response)
-        write_json(run.evidence_dir / "hops" / f"{stem}.delivered.json", hop.hop_dict())
     fetch_result: dict[str, Any] = {
         "url": page.get("url") or url,
         "title": page.get("title") or "",
@@ -644,7 +390,7 @@ def _run_fetch(
     if error:
         fetch_result["error"] = f"fetch failed ({hop.failure_class}, HTTP {hop.http_status})"
         if hop.failure_class in UNSCORED_FAILURES:
-            run.error, run.failure_origin = error, hop.failure_class
+            run.error = error
     conversation.append(_tool_output(call, fetch_result))
 
 
@@ -704,38 +450,6 @@ def _item_as_input(item: Any) -> dict[str, Any]:
 
 class BudgetStop(RuntimeError):
     """The vendor account is out of credit; the round stops here."""
-
-
-# Azure's content filter refuses a prompt with HTTP 400 and one of these error codes; the same request has passed
-# on a later attempt, so the refusal is transient.
-CONTENT_FILTER_CODES = frozenset({"content_filter", "invalid_prompt"})
-
-
-def _model_failure_origin(exc: BaseException) -> str:
-    """A budget stop is ours and final. Transient, so rerun on resume: the model client's connection or timeout
-    failure (the SDK raises APIConnectionError, or its subclass APITimeoutError, only for a transport error); an HTTP
-    400 whose error code names the content filter; an HTTP 429 (our key's rate limit or our concurrency); an HTTP 5xx or
-    408 (the model service's own failure to answer). Any other model error (another refusal, a bad request, any other
-    4xx) is the model's and final."""
-    if isinstance(exc, BudgetStop):
-        return "local"
-    from openai import (
-        APIConnectionError,
-        APIStatusError,
-        BadRequestError,
-        InternalServerError,
-        RateLimitError,
-    )
-
-    if isinstance(exc, APIConnectionError):
-        return "model_transport"
-    if isinstance(exc, BadRequestError) and exc.code in CONTENT_FILTER_CODES:
-        return "model_content_filter"
-    if isinstance(exc, RateLimitError):
-        return "model_rate_limit"
-    if isinstance(exc, InternalServerError) or (isinstance(exc, APIStatusError) and exc.status_code == 408):
-        return "model_server"
-    return "model"
 
 
 def _tool_output(call: Any, payload: dict[str, Any]) -> dict[str, Any]:

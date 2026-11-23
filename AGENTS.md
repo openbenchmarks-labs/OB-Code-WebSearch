@@ -4,7 +4,7 @@ Commands, from the repo root.
 
 ```sh
 uv venv && uv pip install -r requirements.txt
-.venv/bin/python -B -m harness.run selftest --tasks data/questions.jsonl   # offline, no API keys
+.venv/bin/python -B -m harness.obkit data/questions.jsonl   # offline selftest, no API keys
 ```
 
 The OpenBenchmarks team runs this repo through obkit, at the version `benchmark.yaml` pins:
