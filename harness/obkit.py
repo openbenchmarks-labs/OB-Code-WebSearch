@@ -262,8 +262,9 @@ def _packages(files: list[Path]) -> dict[str, str]:
 
 
 def _check_pins() -> None:
+    """Pins with an environment marker (`; sys_platform == ...`) are skipped: they may not apply to this machine."""
     installed = {_canon(d.metadata["Name"]): d.version for d in importlib.metadata.distributions()}
-    pins = re.findall(r"^([A-Za-z0-9_.-]+)==([^\s;]+)", (HERE.parent / "requirements.txt").read_text(), re.M)
+    pins = re.findall(r"^([A-Za-z0-9_.-]+)==([^\s;]+)\s*$", (HERE.parent / "requirements.txt").read_text(), re.M)
     if wrong := [f"{name} {installed[_canon(name)]} (pinned {pin})" for name, pin in pins
                  if _canon(name) in installed and installed[_canon(name)] != pin]:
         raise RuntimeError(f"installed versions differ from requirements.txt: {', '.join(wrong)}: "
