@@ -7,6 +7,9 @@ setups:
       list_usd: 0.005
       basis: list
       bills_empty: true
+      fetch_usd: 0.001
+      fetch_source: https://you.com/docs/administration/billing (Contents API, $1.00 / 1k pages)
+      fetch_date: 2026-11-23
   you_highlights:
     mode: [search_only, search_and_fetch]
     class: main
@@ -14,6 +17,9 @@ setups:
       list_usd: 0.005
       basis: list
       bills_empty: true
+      fetch_usd: 0.001
+      fetch_source: https://you.com/docs/administration/billing (Contents API, $1.00 / 1k pages)
+      fetch_date: 2026-11-23
   you_highlights_core_documented:
     mode: search_only
     class: main

@@ -7,6 +7,9 @@ setups:
       list_usd: 0.016
       basis: list
       bills_empty: true
+      fetch_usd: 0.0032
+      fetch_source: https://docs.tavily.com/documentation/api-credits (advanced Extract, 2 credits per 5 URLs, $0.008 / credit)
+      fetch_date: 2026-11-23
   tavily_basic:
     mode: [search_only, search_and_fetch]
     class: main
@@ -14,3 +17,6 @@ setups:
       list_usd: 0.008
       basis: list
       bills_empty: true
+      fetch_usd: 0.0016
+      fetch_source: https://docs.tavily.com/documentation/api-credits (basic Extract, 1 credit per 5 URLs, $0.008 / credit)
+      fetch_date: 2026-11-23

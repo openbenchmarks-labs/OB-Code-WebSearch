@@ -7,6 +7,9 @@ setups:
       list_usd: 0.01
       basis: list
       bills_empty: false
+      fetch_usd: 0.005
+      fetch_source: https://docs.firecrawl.dev/billing (Scrape, 1 credit / page) at https://www.firecrawl.dev/pricing (1,000 extra credits per $5)
+      fetch_date: 2026-11-23
   firecrawl_domains:
     mode: search_only
     class: main

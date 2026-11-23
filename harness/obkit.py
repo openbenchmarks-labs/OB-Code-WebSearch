@@ -58,6 +58,8 @@ def _arms() -> dict[str, tuple[str, str]]:
     for path in sorted((HERE.parent / "tools").glob("*.yaml")):
         for name, cfg in (yaml.safe_load(path.read_text()).get("setups") or {}).items():
             modes = cfg["mode"] if isinstance(cfg["mode"], list) else [cfg["mode"]]
+            if "search_and_fetch" in modes and "fetch_usd" not in (cfg.get("pricing") or {}):
+                raise ValueError(f"tools/{path.name} setups.{name}: a fetch setup needs pricing.fetch_usd")
             out |= {name if len(modes) == 1 else f"{name}+{mode}": (name, mode) for mode in modes}
     return out
 
@@ -338,8 +340,9 @@ def answer(question: dict, setup: str, *, dry: bool, tracer=None) -> dict:
     sent = [call for call in run.searches if call.request_attempted]
     price = _price(ARMS[setup][0])
     billed = sum(1 for call in sent if not call.error and (call.n_hits or price.get("bills_empty")))
+    fetched = sum(1 for call in run.fetches if call.request_attempted and not call.error)
     per_mtok = CONFIG["usd_per_mtok"]
-    vendor_cost = billed * float(price.get("list_usd") or 0)
+    vendor_cost = billed * float(price.get("list_usd") or 0) + fetched * float(price.get("fetch_usd") or 0)
     llm_cost = (run.llm_prompt_tokens * per_mtok["input"] + run.llm_completion_tokens * per_mtok["output"]) / 1e6
     metrics = run.metrics()
     cost_facts = {
