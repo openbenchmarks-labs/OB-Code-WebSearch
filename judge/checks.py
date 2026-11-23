@@ -132,12 +132,16 @@ _RECORDED: dict[tuple[str, str], dict] = {}
 
 
 def recorded(row: dict, which: str) -> dict:
-    """The requests a question's reference fix (`gold`) or starter sends to the stand-in, recorded once per question."""
+    """The requests a question's reference fix (`gold`) or starter sends to the stand-in. A recording that sent a
+    request is kept for the process; one that sent none (a timeout under load, a crash) is tried again next time."""
     key = (row["task_id"], which)
-    if key not in _RECORDED:
-        src = row["gold_code"] if which == "gold" else row["starter_code"]
-        _RECORDED[key] = record(src) if src else {"requests": [], "error": "no file"}
-    return _RECORDED[key]
+    if key in _RECORDED:
+        return _RECORDED[key]
+    src = row["gold_code"] if which == "gold" else row["starter_code"]
+    result = record(src) if src else {"requests": [], "error": "no file"}
+    if result["requests"]:
+        _RECORDED[key] = result
+    return result
 
 
 VENDORS = {"gen": "Genesys Cloud", "sf": "SAP SuccessFactors", "sap": "SAP S/4HANA Cloud", "sn": "ServiceNow",
@@ -179,14 +183,16 @@ def ticket_text(row: dict) -> str:
 
 
 def question(row: dict) -> str:
-    starter = recorded(row, "starter")["requests"]
-    now = ""
-    if starter:
-        r = starter[0]
-        now = f"{r['method'].upper()} {r['path']}" + (f" (SOAP operation {r['soap']})" if r.get("soap") else "")
+    """The question text. Every question's starter sends a request, so a recording that sent none is our failure and
+    raises, rather than asking a question without its "sends this request today" line."""
+    starter = recorded(row, "starter")
+    if not starter["requests"]:
+        raise RuntimeError(f"{row['task_id']}: the starter sent no request to the stand-in ({starter.get('error')})")
+    r = starter["requests"][0]
+    now = f"{r['method'].upper()} {r['path']}" + (f" (SOAP operation {r['soap']})" if r.get("soap") else "")
     qid = row["task_id"]
     vendor = VENDORS.get(qid.split("_")[1], "") if qid.count("_") >= 2 else ""
-    return (f"Vendor: {vendor}\n" if vendor else "") + (f"The program sends this request today: {now}\n" if now else "") + \
+    return (f"Vendor: {vendor}\n" if vendor else "") + f"The program sends this request today: {now}\n" + \
         f"Ticket: {ticket_text(row)}\n\nWhich request does the ticket need?"
 
 
