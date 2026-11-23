@@ -7,6 +7,9 @@ setups:
       list_usd: 0.005
       basis: list
       bills_empty: false
+      fetch_usd: 0.005
+      fetch_source: https://docs.linkup.so/pages/documentation/platform/pricing (Fetch, mode standard, renderJs true, $0.005 per call)
+      fetch_date: 2026-11-23
   linkup_fast:
     mode: search_only
     class: main

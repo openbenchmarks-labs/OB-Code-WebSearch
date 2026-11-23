@@ -7,6 +7,9 @@ setups:
       list_usd: 0.005
       basis: list
       bills_empty: true
+      fetch_usd: 0.0
+      fetch_source: https://www.tinyfish.ai/pricing (TinyFetch, $0.00 per url)
+      fetch_date: 2026-11-23
   tinyfish_no_purpose:
     mode: search_only
     class: main

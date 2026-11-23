@@ -7,6 +7,9 @@ setups:
       list_usd: 0.007
       basis: list
       bills_empty: false
+      fetch_usd: 0.001
+      fetch_source: https://exa.ai/pricing (Contents, $1 / 1k pages per content type; text only)
+      fetch_date: 2026-11-23
   exa_auto_domains:
     mode: search_only
     class: main

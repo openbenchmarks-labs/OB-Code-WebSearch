@@ -7,6 +7,9 @@ setups:
       list_usd: 0.005
       basis: list
       bills_empty: true
+      fetch_usd: 0.001
+      fetch_source: https://www.nimbleway.com/pricing (Extract, $1 / 1k requests)
+      fetch_date: 2026-11-23
   nimble_lite_coding:
     mode: search_only
     class: main

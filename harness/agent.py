@@ -581,7 +581,9 @@ def _run_fetch(
     fetch_fn: Callable[[str, str], dict[str, str]] | None,
     turn: int,
 ) -> None:
-    if len(run.fetches) >= max_fetches:
+    # Like a search with no results, a fetch that failed or came back empty does not use one of the max_fetches;
+    # the turn it took still counts.
+    if sum(1 for done in run.fetches if not done.error and done.content.strip()) >= max_fetches:
         conversation.append(_tool_output(call, {"error": "fetch budget exhausted; answer now"}))
         run.notes.append("fetch budget exhausted")
         return
