@@ -1,4 +1,15 @@
+# The LLM verifier never changes a score. The first reader reads every answer; the second reads again only where the
+# first disagrees or is unsure. A row the second reader still disagrees with or is unsure of goes to a person.
+# Both run on AWS Bedrock (Converse API), with the prices and limits the 15-17 Nov 2026 verifier runs used.
 verifier:
-  model: gpt-6-sol
-  usd_per_mtok: {input: 2.00, output: 10.00}
-verify_usd: {expected: 0.01, max: 0.05}
+  first:
+    model: us.anthropic.claude-haiku-5-5
+    max_tokens: 6000
+    usd_per_mtok: {input: 0.11, output: 0.55}
+  second:
+    model: us.anthropic.claude-sonnet-5-5
+    max_tokens: 6000
+    usd_per_mtok: {input: 2.20, output: 11.00}
+# One answer: a first reading, and a second one where needed. max covers both readings at max_tokens with an 8,000-token
+# input (0.004 + 0.084).
+verify_usd: {expected: 0.005, max: 0.10, source: per-token prices of the 15-17 Nov 2026 verifier runs (AWS Bedrock on-demand), date: 2026-11-23}

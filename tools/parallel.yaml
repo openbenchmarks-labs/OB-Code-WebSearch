@@ -1,12 +1,15 @@
 tool: parallel
 setups:
   parallel_fast_tool:
-    mode: search_only
+    mode: [search_only, search_and_fetch]
     class: main
     pricing:
       list_usd: 0.001
       basis: list
       bills_empty: true
+      fetch_usd: 0.001
+      fetch_source: https://docs.parallel.ai/getting-started/pricing (Extract API, $1 / 1,000 URLs)
+      fetch_date: 2026-11-23
   parallel_advanced_tool:
     mode: search_only
     class: main

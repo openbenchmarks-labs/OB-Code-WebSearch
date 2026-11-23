@@ -1,11 +1,11 @@
 name: OB-Code-Websearch
 serves: Teams choosing a web search API as the search step of a coding agent that writes code against enterprise product APIs (Workday, SAP, UKG, Veeva, Genesys, ServiceNow).
-win: The search API with which the agent answers more ranked questions in the held-out set with a request the ground truth accepts, under the same model, budget, and day; ties within noise.
-obkit: 0.5.2
+win: The search API with which the agent scores highest on the ranked held-out questions with a request the ground truth accepts (each question scores the share of its three runs that pass; the original group weighs 70% and the reserve group 30%), under the same model, budget, and day; no setup is called better than another when their 95% ranges overlap.
+obkit: 0.5.3
 sets:
   public: {path: data/questions.jsonl}
-  validation: {sha256: 599b58d761fb8749312646d2109d0c18943925923568f04d1fe246b3b283604a}
-  private: {sha256: d738404da2f1aaba40bcf572f19af34bbd85dd872f80526d28ad864255650e1e}
+  validation: {sha256: 93546b5b30656b4e51c515510043a60903a3a7c32ec4d0734a218e5becfedfda}
+  private: {sha256: 23db3b3c1b5ba0c2d80fc86bea40a8384f70fe6a8a977a6ccfaebeac8bfa8aab}
 question_id: task_id
 split_axes: [vendor, kind]
 split_gap_max: 0.1
@@ -19,6 +19,19 @@ budget_usd: 0
 refresh_days: 30
 not_measured_max: 0.1
 judge_error_max: 0.05
+# The published method (lab.openbenchmarks.com/ob-code-websearch, Evaluation Metrics) for the validation and private sets.
+# Ranked: questions with an answer page that robots.txt opens to all nine crawler names; the rest run once, apart.
+# Weights: each group's pool times its share with an open answer page, normalised: 525 x 297/399 = 390.79 and
+# 380 x 141/316 = 169.56, so 0.6974 and 0.3026 (shown rounded as 70% and 30%).
+scoring:
+  sets: {validation: 1, private: 3}
+  item: share
+  apart: {field: crawler_open, equals: false, repeats: 1}
+  groups: {field: question_group, weights: {first selection: 0.6974, extension: 0.3026}}
+  bootstrap: {draws: 10000, seed: 20261117}
+  attempts: 3
+  unfinished_max: 4
+  halt_after: 3
 hooks:
   selftest: python -B -m harness.obkit data/questions.jsonl
   answer: harness.obkit:answer

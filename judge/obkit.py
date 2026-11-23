@@ -26,30 +26,66 @@ def grade(question: dict, answer: str) -> bool:
     return grade_call(question["retrieval_key"]["accepted"], answer)
 
 
+def _read(reader: dict, user: str) -> tuple[str, float]:
+    """One reader's PASS, FAIL or UNSURE through the Bedrock Converse API, and what the call cost."""
+    import os
+
+    import requests
+
+    region, token = os.environ.get("AWS_REGION"), os.environ.get("AWS_BEARER_TOKEN_BEDROCK")
+    if not region or not token:
+        raise RuntimeError("set AWS_REGION and AWS_BEARER_TOKEN_BEDROCK for the verifier")
+    response = requests.post(
+        f"https://bedrock-runtime.{region}.amazonaws.com/model/{reader['model']}/converse",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={
+            "system": [{"text": PROMPT}],
+            "messages": [{"role": "user", "content": [{"text": user}]}],
+            "inferenceConfig": {"maxTokens": reader["max_tokens"]},
+        },
+        timeout=120,
+    )
+    response.raise_for_status()
+    body = response.json()
+    text = "".join(part.get("text", "") for part in body["output"]["message"]["content"])
+    price = reader["usd_per_mtok"]
+    cost = (body["usage"]["inputTokens"] * price["input"] + body["usage"]["outputTokens"] * price["output"]) / 1e6
+    return _verdict(text), cost
+
+
+def _verdict(text: str) -> str:
+    """The `verdict` of the last {"verdict": ...} object in a reply, as the prompt asks; "" when there is none."""
+    starts = [m.start() for m in re.finditer(r'\{\s*"verdict"', text)]
+    if not starts:
+        return ""
+    try:
+        vote = json.JSONDecoder().raw_decode(text, starts[-1])[0]
+    except ValueError:
+        return ""
+    return str(vote.get("verdict", "")).strip().upper()
+
+
 def verify(question: dict, answer: str, passed: bool, *, dry: bool) -> dict:
-    """agree, disagree or unsure with the deterministic verdict, and what the call cost. It never changes a score."""
+    """agree, disagree or unsure with the deterministic verdict, and what the calls cost. The first reader reads every
+    answer; the second reads again only where the first disagrees or is unsure, and its reading stands. A disagree or
+    unsure goes to a person, who rules from the vendor documentation. It never changes a score."""
     if dry:
         return {"verdict": "agree", "cost_usd": 0.0}
-    from harness.obkit import load_environment, make_llm_client
+    from harness.obkit import load_environment
 
     load_environment()
     right = "\n".join(
         f"{r['method']} {r['address']}" + (f" (SOAP {r['soap']})" if r.get("soap") else "")
         for r in question["retrieval_key"]["accepted"]
     )
-    reply = make_llm_client(timeout=120, max_retries=1).responses.create(
-        model=CONFIG["verifier"]["model"],
-        reasoning={"effort": "low"},
-        store=False,
-        instructions=PROMPT,
-        input=f"Task:\n{question['ticket']}\n\nRight answers:\n{right}\n\nAgent's call:\n{answer}\n\n"
-        "End with one line: PASS, FAIL or UNSURE.",
-    )
-    price = CONFIG["verifier"]["usd_per_mtok"]
-    usage = reply.usage
-    cost = (usage.input_tokens * price["input"] + usage.output_tokens * price["output"]) / 1e6
-    word = ((reply.output_text or "").strip().splitlines() or [""])[-1].strip().upper()
-    verdict = "unsure" if word not in VERDICTS else "agree" if VERDICTS[word] == passed else "disagree"
+    user = f"Task:\n{question['ticket']}\n\nRight answers:\n{right}\n\nAgent's call:\n{answer}"
+    cost = 0.0
+    for reader in (CONFIG["verifier"]["first"], CONFIG["verifier"]["second"]):
+        word, spent = _read(reader, user)
+        cost += spent
+        verdict = "unsure" if word not in VERDICTS else "agree" if VERDICTS[word] == passed else "disagree"
+        if verdict == "agree":
+            break
     return {"verdict": verdict, "cost_usd": cost}
 
 
