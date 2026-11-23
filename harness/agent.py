@@ -286,12 +286,12 @@ def run_agent(
         tools.append(_search_tool(backend))
     if allow_fetch:
         tools.append(WEB_FETCH_TOOL)
-    # Every lane: each search call takes a turn, including separate calls in one model response, so empty or failed
-    # searches, which do not use one of the max_searches, are still capped by max_turns.
-    extra_search_turns = 0
+    # Every lane: each search or fetch call takes a turn, including separate calls in one model response, so empty or
+    # failed ones, which do not use one of the max_searches or max_fetches, are still capped by max_turns.
+    extra_tool_turns = 0
     started = time.perf_counter()
     for model_turn in range(max_turns):
-        turn = model_turn + extra_search_turns
+        turn = model_turn + extra_tool_turns
         if turn >= max_turns:
             break
         llm_started = time.perf_counter()
@@ -343,7 +343,7 @@ def run_agent(
             run.wall_ms = int((time.perf_counter() - started) * 1000)
             return run
         _append_model_output(conversation, response)
-        search_calls_this_response = 0
+        search_calls_this_response = fetch_calls_this_response = 0
         for call in calls:
             name = _call_name(call)
             if name == "web_search":
@@ -356,7 +356,7 @@ def run_agent(
                         run.notes.append("turn budget exhausted")
                         continue
                     turn += 1
-                    extra_search_turns += 1
+                    extra_tool_turns += 1
                 search_calls_this_response += 1
                 _run_search(
                     call,
@@ -375,6 +375,14 @@ def run_agent(
                 if not allow_fetch:
                     conversation.append(_tool_output(call, {"error": "web_fetch is not available; search again"}))
                     continue
+                if fetch_calls_this_response:
+                    if turn + 1 >= max_turns:
+                        conversation.append(_tool_output(call, {"error": "turn budget exhausted; answer now"}))
+                        run.notes.append("turn budget exhausted")
+                        continue
+                    turn += 1
+                    extra_tool_turns += 1
+                fetch_calls_this_response += 1
                 _run_fetch(
                     call,
                     run=run,
