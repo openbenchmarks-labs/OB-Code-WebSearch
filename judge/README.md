@@ -3,7 +3,7 @@
 Grades answers against ground truth, and builds the question the agent is asked.
 
 - `checks.py` — The question text, the system prompts and answer format the agent gets, the recorder that runs a starter or reference fix against a local stand-in to see the request it sends, and the answer grader (`grade`).
-- `obkit.py` — The obkit hooks: `grade`, `verify` (the LLM verifier, which never changes a score) and `key_check` (is each accepted request on its docs page).
+- `obkit.py` — The obkit hooks: `grade`, `verify` (the LLM verifier, which never changes a score) and `key_check` (whether an accepted request appears on its docs pages).
 - `config.yaml` — The verifier's model and prices.
 - `cases.jsonl` — Planted answers with the verdict the grader must give.
 - `verifier_prompt.txt` — Prompt for the LLM verifier.

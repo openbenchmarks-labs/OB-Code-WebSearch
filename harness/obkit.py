@@ -39,7 +39,7 @@ PROBE_URL = "https://example.com/obkit-probe"
 PROBE_HITS = [
     {"url": f"https://example.com/{i}", "title": f"title {i}", "snippet": "snippet " * 400} for i in range(12)
 ]
-PROBE_PAGE = {"requested_url": PROBE_URL, "final_url": PROBE_URL, "title": "probe", "text": "page " * 9000}
+PROBE_PAGE = {"url": PROBE_URL, "title": "probe", "content": "page " * 9000}
 
 
 class _Sent(Exception):
