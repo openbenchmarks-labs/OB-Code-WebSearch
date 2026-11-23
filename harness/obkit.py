@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
+import importlib.metadata
 import json
 import os
 import re
+import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -153,9 +156,12 @@ def contract(questions: list[dict]) -> dict:
 
 
 def probe(setup: str) -> dict:
-    """The request this arm sends for a fixed query (and a fixed fetch), recorded offline, plus its tool schema."""
+    """The request this arm sends for a fixed query (and a fixed fetch), recorded offline, plus its tool schema, a
+    digest of the answer-path code and the versions of the packages that code imports."""
+    files = sorted(_imported(HERE / "obkit.py"))
+    answer_path = {"code": _code_digest(files), "packages": _packages(files)}
     if ARMS[setup][1] == "no_search":
-        return {"setup": setup}
+        return {"setup": setup, **answer_path}
     sent: list = []
 
     def record(method, url, **kwargs):
@@ -181,7 +187,91 @@ def probe(setup: str) -> dict:
                 pass
             except Exception as exc:  # noqa: BLE001
                 sent.append({"raises": f"{type(exc).__name__}: {exc}"})
-    return {"tool": agent._search_tool(backend), "sent": json.loads(json.dumps(sent, default=str))}
+    return {"tool": agent._search_tool(backend), "sent": json.loads(json.dumps(sent, default=str)), **answer_path}
+
+
+def _code_digest(files: list[Path]) -> str:
+    """sha256 of `files`, each as normalized source (docstrings dropped, `ast.unparse`), so comments, docstrings and
+    layout do not count, and every Python version gives the same digest. `search.py` holds every backend, so a change
+    there moves every arm."""
+    digest = hashlib.sha256()
+    for path in files:
+        digest.update(f"{path.relative_to(HERE).as_posix()}\n{_source(path)}\n".encode())
+    return digest.hexdigest()
+
+
+def _imported(start: Path) -> set[Path]:
+    """`start` and the harness modules it imports, directly or through other harness modules."""
+    seen: set[Path] = set()
+    todo = [start]
+    while todo:
+        path = todo.pop()
+        if path in seen:
+            continue
+        seen.add(path)
+        package = path.relative_to(HERE).parent.parts
+        for node in ast.walk(ast.parse(path.read_bytes())):
+            if isinstance(node, ast.ImportFrom) and node.level:
+                base = [*package[:len(package) - node.level + 1], *(node.module.split(".") if node.module else [])]
+            elif isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] == "harness":
+                base = node.module.split(".")[1:]
+            elif isinstance(node, ast.Import):
+                todo += _module_files([[*n.name.split(".")[1:]] for n in node.names if n.name.split(".")[0] == "harness"])
+                continue
+            else:
+                continue
+            todo += _module_files([base, *[[*base, alias.name] for alias in node.names]])
+    return seen
+
+
+def _module_files(names: list[list[str]]) -> list[Path]:
+    files = []
+    for parts in names:
+        for path in (HERE.joinpath(*parts, "__init__.py"), HERE.joinpath(*parts[:-1], f"{parts[-1]}.py") if parts else None):
+            if path is not None and path.is_file():
+                files.append(path.resolve())
+    return files
+
+
+def _source(path: Path) -> str:
+    tree = ast.parse(path.read_bytes())
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if isinstance(body, list) and body and isinstance(body[0], ast.Expr) \
+                and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+            node.body = body[1:] or [ast.Pass()]
+    return ast.unparse(tree)
+
+
+def _packages(files: list[Path]) -> dict[str, str]:
+    """The installed version of every third-party package `files` import, so a different version of one is a
+    different setup version. Raises when the venv differs from a pin in requirements.txt or an import has no installed
+    package, so a stale venv is refused instead of re-versioning arms. The repo's own packages (`judge`) are skipped."""
+    _check_pins()
+    names = {
+        name.split(".")[0]
+        for path in files for node in ast.walk(ast.parse(path.read_bytes()))
+        for name in ([n.name for n in node.names] if isinstance(node, ast.Import)
+                     else [node.module] if isinstance(node, ast.ImportFrom) and not node.level and node.module else [])
+    } - set(sys.stdlib_module_names) - {"harness"}
+    names = {n for n in names if not (HERE.parent / n).is_dir() and not (HERE.parent / f"{n}.py").is_file()}
+    owners = importlib.metadata.packages_distributions()
+    if missing := sorted(n for n in names if not owners.get(n)):
+        raise RuntimeError(f"no installed package provides {', '.join(missing)}: run uv pip install -r requirements.txt")
+    return {dist: importlib.metadata.version(dist) for name in sorted(names) for dist in owners[name]}
+
+
+def _check_pins() -> None:
+    installed = {_canon(d.metadata["Name"]): d.version for d in importlib.metadata.distributions()}
+    pins = re.findall(r"^([A-Za-z0-9_.-]+)==([^\s;]+)", (HERE.parent / "requirements.txt").read_text(), re.M)
+    if wrong := [f"{name} {installed[_canon(name)]} (pinned {pin})" for name, pin in pins
+                 if _canon(name) in installed and installed[_canon(name)] != pin]:
+        raise RuntimeError(f"installed versions differ from requirements.txt: {', '.join(wrong)}: "
+                           "run uv pip install -r requirements.txt")
+
+
+def _canon(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def _canned(question: dict, setup: str) -> dict:

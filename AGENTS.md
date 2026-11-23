@@ -14,3 +14,5 @@ obkit check                                         # the selftest above, plus t
 obkit go --set public --tools <setups> --dry       # canned replies, no spend; judges and writes the board
 obkit add-set validation|private FILE              # store a held-out set by its sha256 and name it here
 ```
+
+`requirements.txt` pins every dependency, compiled from `harness/requirements.in` with `uv pip compile --universal --no-header harness/requirements.in -o requirements.txt`. obkit refuses a venv that differs from it, since package versions are part of each setup's version.
