@@ -14,3 +14,5 @@ obkit check                                         # the selftest above, plus t
 obkit go --set public --tools <setups> --dry       # canned replies, no spend; judges and writes the board
 obkit add-set validation|private FILE              # store a held-out set by its sha256 and name it here
 ```
+
+`requirements.txt` pins every dependency, compiled from `harness/requirements.in` with `uv pip compile --universal --no-header harness/requirements.in -o requirements.txt`. obkit refuses a venv that differs from it. Each setup's version holds the code that turns a vendor's reply into an answer (every harness module, so any logic edit in `harness/` re-runs every arm) and the versions of the packages the harness imports directly.
