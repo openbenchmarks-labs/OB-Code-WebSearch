@@ -12,6 +12,7 @@ setups:
       fetch_date: 2026-11-23
       answer_usd: {expected: 0.0241, max: 0.165, source: "17 Nov val run, 322 answers per mode, search_only 4.73 billed searches, search_and_fetch 4.63 searches + 1.50 fetches", date: 2026-11-23}
   nimble_lite_coding:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:
@@ -20,6 +21,7 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.0055, max: 0.0352, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   nimble_lite:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:

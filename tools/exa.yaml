@@ -1,6 +1,7 @@
 tool: exa
 setups:
   exa_auto:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: [search_only, search_and_fetch]
     class: main
     pricing:
@@ -12,6 +13,7 @@ setups:
       fetch_date: 2026-11-23
       answer_usd: {expected: 0.0375, max: 0.04, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-23}
   exa_auto_domains:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:
@@ -20,6 +22,7 @@ setups:
       bills_empty: false
       answer_usd: {expected: 0.035, max: 0.035, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   exa_fast:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:
@@ -30,6 +33,7 @@ setups:
       date: 2026-11-19
       answer_usd: {expected: 0.0288, max: 0.035, source: "28 Oct val run, 55 answers, 4.11 billed searches each", date: 2026-11-23}
   exa_lite:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:
@@ -38,6 +42,7 @@ setups:
       bills_empty: false
       answer_usd: {expected: 0.02, max: 0.02, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   exa_instant:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:

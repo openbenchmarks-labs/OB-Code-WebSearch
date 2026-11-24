@@ -1,6 +1,7 @@
 tool: brave
 setups:
   brave:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:
@@ -9,6 +10,7 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.0234, max: 0.16, source: "28 Oct val run, 55 answers, 4.67 billed searches each", date: 2026-11-23}
   brave_tokens_6100:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:

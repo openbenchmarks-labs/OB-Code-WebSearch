@@ -1,6 +1,7 @@
 tool: linkup
 setups:
   linkup_standard:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: [search_only, search_and_fetch]
     class: main
     pricing:
@@ -12,6 +13,7 @@ setups:
       fetch_date: 2026-11-23
       answer_usd: {expected: 0.0375, max: 0.05, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-23}
   linkup_fast:
+    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:
