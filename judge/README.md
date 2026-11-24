@@ -6,8 +6,17 @@ Grades answers against ground truth, and builds the question the agent is asked.
 - `obkit.py` — The obkit hooks: `grade`, `verify` (the LLM verifier, which never changes a score) and `key_check` (whether an accepted request appears on its docs pages).
 - `config.yaml` — The verifier's two readers (Claude Haiku 5.5 reads every answer; Claude Sonnet 5.5 reads again where Haiku disagrees or is unsure), their prices, and the cost of one verified answer.
 - `cases.jsonl` — Planted answers with the verdict the grader must give.
+- `diagnostics.py` — Classifies agent misses from obkit run rows into root causes (empty search results, vendor error, wrong method, missing expands).
 - `verifier_prompt.txt` — Prompt for the LLM verifier.
 
 ## What the answer grader checks
 
 The answer grader in this repo (`checks.grade`, called from `judge/obkit.py`) passes an answer when its call matches one of the question's right calls. For REST, that means the same method and path, and the call must expand every name the right call expands: each top-level name in an `$expand` in its address, and the name in its `require_query` field. For SOAP, it means the same operation sent to the Workday service that owns it. Apart from those expands, the grader does not read query parameters or body fields, even when the ticket asks for them, so a call to the right endpoint with a missing or misnamed field still passes. The grader does not read the key's `required_query` field.
+
+## Post-run failure diagnostics
+
+To classify why an agent failed on an obkit benchmark run (e.g. empty results vs wrong method vs missing $expand):
+
+```sh
+python -m judge.diagnostics --runs <runs.json> --tasks data/questions.jsonl
+```
