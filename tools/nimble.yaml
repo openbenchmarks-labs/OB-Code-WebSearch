@@ -10,6 +10,7 @@ setups:
       fetch_usd: 0.001
       fetch_source: https://www.nimbleway.com/pricing (Extract, $1 / 1k requests)
       fetch_date: 2026-11-23
+      answer_usd: {expected: 0.0241, max: 0.165, source: "17 Nov val run, 322 answers per mode, search_only 4.73 billed searches, search_and_fetch 4.63 searches + 1.50 fetches", date: 2026-11-23}
   nimble_lite_coding:
     mode: search_only
     class: main
@@ -17,6 +18,7 @@ setups:
       list_usd: 0.0011
       basis: list
       bills_empty: true
+      answer_usd: {expected: 0.0055, max: 0.0352, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   nimble_lite:
     mode: search_only
     class: main
@@ -24,3 +26,4 @@ setups:
       list_usd: 0.0011
       basis: list
       bills_empty: true
+      answer_usd: {expected: 0.0041, max: 0.0352, source: "28 Oct val run, 55 answers, 3.75 billed searches each", date: 2026-11-23}

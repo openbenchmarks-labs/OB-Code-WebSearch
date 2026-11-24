@@ -10,6 +10,7 @@ setups:
       fetch_usd: 0.005
       fetch_source: https://docs.firecrawl.dev/billing (Scrape, 1 credit / page) at https://www.firecrawl.dev/pricing (1,000 extra credits per $5)
       fetch_date: 2026-11-23
+      answer_usd: {expected: 0.0496, max: 0.075, source: "17 Nov val run, 322 answers per mode, search_only 4.72 billed searches, search_and_fetch 3.96 searches + 2.51 fetches", date: 2026-11-23}
   firecrawl_domains:
     mode: search_only
     class: main
@@ -17,3 +18,4 @@ setups:
       list_usd: 0.01
       basis: list
       bills_empty: false
+      answer_usd: {expected: 0.05, max: 0.05, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}

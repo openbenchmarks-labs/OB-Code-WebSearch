@@ -10,6 +10,7 @@ setups:
       fetch_usd: 0.005
       fetch_source: https://docs.linkup.so/pages/documentation/platform/pricing (Fetch, mode standard, renderJs true, $0.005 per call)
       fetch_date: 2026-11-23
+      answer_usd: {expected: 0.0375, max: 0.05, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-23}
   linkup_fast:
     mode: search_only
     class: main
@@ -17,3 +18,4 @@ setups:
       list_usd: 0.005
       basis: list
       bills_empty: false
+      answer_usd: {expected: 0.0241, max: 0.025, source: "28 Oct val run, 55 answers, 4.82 billed searches each", date: 2026-11-23}

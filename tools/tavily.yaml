@@ -10,6 +10,7 @@ setups:
       fetch_usd: 0.0032
       fetch_source: https://docs.tavily.com/documentation/api-credits (advanced Extract, 2 credits per 5 URLs, $0.008 / credit)
       fetch_date: 2026-11-23
+      answer_usd: {expected: 0.088, max: 0.528, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-23}
   tavily_basic:
     mode: [search_only, search_and_fetch]
     class: main
@@ -20,3 +21,4 @@ setups:
       fetch_usd: 0.0016
       fetch_source: https://docs.tavily.com/documentation/api-credits (basic Extract, 1 credit per 5 URLs, $0.008 / credit)
       fetch_date: 2026-11-23
+      answer_usd: {expected: 0.0394, max: 0.264, source: "28 Oct val run, 55 answers per mode, search_only 4.85 billed searches, search_and_fetch 4.76 searches + 1.18 fetches", date: 2026-11-23}
