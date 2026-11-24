@@ -2,7 +2,6 @@ tool: exa
 setups:
   exa_auto:
     mode: [search_only, search_and_fetch]
-    class: main
     pricing:
       list_usd: 0.007
       basis: list
@@ -13,7 +12,6 @@ setups:
       answer_usd: {expected: 0.0375, max: 0.04, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-23}
   exa_auto_domains:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.007
       basis: list
@@ -21,7 +19,6 @@ setups:
       answer_usd: {expected: 0.035, max: 0.035, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   exa_fast:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.007
       basis: list
@@ -31,7 +28,6 @@ setups:
       answer_usd: {expected: 0.0288, max: 0.035, source: "28 Oct val run, 55 answers, 4.11 billed searches each", date: 2026-11-23}
   exa_lite:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.004
       basis: list
@@ -39,7 +35,6 @@ setups:
       answer_usd: {expected: 0.02, max: 0.02, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   exa_instant:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.004
       basis: list

@@ -2,7 +2,6 @@ tool: serp
 setups:
   serp:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.003
       basis: list
@@ -10,7 +9,6 @@ setups:
       answer_usd: {expected: 0.015, max: 0.096, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   serp_en_us:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.003
       basis: list

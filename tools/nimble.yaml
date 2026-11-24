@@ -2,7 +2,6 @@ tool: nimble
 setups:
   nimble_standard:
     mode: [search_only, search_and_fetch]
-    class: main
     pricing:
       list_usd: 0.005
       basis: list
@@ -13,7 +12,6 @@ setups:
       answer_usd: {expected: 0.0241, max: 0.165, source: "17 Nov val run, 322 answers per mode, search_only 4.73 billed searches, search_and_fetch 4.63 searches + 1.50 fetches", date: 2026-11-23}
   nimble_lite_coding:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.0011
       basis: list
@@ -21,7 +19,6 @@ setups:
       answer_usd: {expected: 0.0055, max: 0.0352, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   nimble_lite:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.0011
       basis: list

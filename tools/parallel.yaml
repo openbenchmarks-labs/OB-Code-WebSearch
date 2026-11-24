@@ -2,7 +2,6 @@ tool: parallel
 setups:
   parallel_fast_tool:
     mode: [search_only, search_and_fetch]
-    class: main
     pricing:
       list_usd: 0.001
       basis: list
@@ -13,7 +12,6 @@ setups:
       answer_usd: {expected: 0.0025, max: 0.037, source: "17 Nov val run, 322 answers per mode, search_only 2.00 billed searches, search_and_fetch 1.57 searches + 1.33 fetches", date: 2026-11-23}
   parallel_advanced_tool:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.005
       basis: list
@@ -21,7 +19,6 @@ setups:
       answer_usd: {expected: 0.0095, max: 0.16, source: "17 Nov val run, 322 answers, 1.91 billed searches each", date: 2026-11-23}
   parallel_fast:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.001
       basis: list
@@ -31,7 +28,6 @@ setups:
       answer_usd: {expected: 0.004, max: 0.032, source: "28 Oct val run, 55 answers, 4.04 billed searches each", date: 2026-11-23}
   parallel_fast_raw:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.001
       basis: list

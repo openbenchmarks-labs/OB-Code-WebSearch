@@ -1,4 +1,3 @@
-subject: coding_agent
 model: gpt-6-sol
 effort: medium
 limits:
@@ -6,8 +5,6 @@ limits:
   max_searches: 5
   max_fetches: 5
   results_per_search: 8
-  preview_chars: 32000
-repeats: 3
 usd_per_mtok: {input: 2.00, output: 10.00}
 # The model cost of one answer at usd_per_mtok, the rates the harness bills each answer at; search and fetch fees are each
 # setup's pricing.answer_usd in tools/. An answer that costs more than its hold stops the run, so max sits about 3x above

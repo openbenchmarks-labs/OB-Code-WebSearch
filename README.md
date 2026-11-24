@@ -8,7 +8,7 @@ Published and maintained by **[OpenBenchmarks Labs](https://openbenchmarks.com)*
 
 ## Methodology
 
-Each task gives a coding agent a realistic integration ticket against an enterprise product API (such as Workday, SAP SuccessFactors, UKG, Veeva, Genesys Cloud, or ServiceNow) along with starter code. The agent searches the web using the configured search API and produces a final API call.
+Each task gives a coding agent a realistic integration ticket against an enterprise product API (such as Workday, SAP SuccessFactors, UKG, Veeva, Genesys Cloud, or ServiceNow) and the request the existing code sends today. The agent searches the web using the configured search API and produces a final API call.
 
 - **Two boards:** **Search only** and **Search & fetch** are ranked separately.
 - **Fixed protocol:** Every tool runs with the same coding model, turn limit, search budget, and day (`harness/config.yaml`).
