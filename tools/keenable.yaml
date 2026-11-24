@@ -17,7 +17,6 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.0179, max: 0.128, source: "17 Nov val run, 322 answers, 4.47 billed searches each", date: 2026-11-23}
   keenable_pro_snippet4000:
-    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:

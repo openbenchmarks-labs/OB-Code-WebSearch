@@ -12,7 +12,6 @@ setups:
       fetch_date: 2026-11-23
       answer_usd: {expected: 0.0225, max: 0.16, source: "17 Nov val run, 322 answers per mode, search_only 4.84 billed searches, search_and_fetch 4.15 searches + 2.30 fetches", date: 2026-11-23}
   tinyfish_no_purpose:
-    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:

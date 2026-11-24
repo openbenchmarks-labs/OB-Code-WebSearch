@@ -1,7 +1,6 @@
 tool: serp
 setups:
   serp:
-    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:
@@ -10,7 +9,6 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.015, max: 0.096, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   serp_en_us:
-    excluded: not in the 17 Nov validation lineup (PR 33, 23 Nov 2026)
     mode: search_only
     class: main
     pricing:
