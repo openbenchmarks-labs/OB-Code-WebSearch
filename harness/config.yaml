@@ -9,10 +9,10 @@ limits:
   preview_chars: 32000
 repeats: 3
 usd_per_mtok: {input: 2.00, output: 10.00}
-# The model cost of one answer. Measured with exa_fast, so it holds up to 5 x $0.007 of searches that the estimate
-# adds again: an over-count of at most $0.035 an answer.
+# The model cost of one answer; search and fetch fees are each setup's pricing.answer_usd in tools/. An answer that costs
+# more than its hold stops the run, so max sits above the largest answer seen.
 answer_usd:
-  expected: 0.30
-  max: 0.60
-  source: a paid run of 5 answers on gpt-6-sol with exa_fast, $0.21 to $0.36 each
-  date: 2026-11-20
+  expected: 0.29
+  max: 3.00
+  source: 17 Nov val run on gpt-6-sol medium, 4,507 answers over 14 arms, mean $0.287, largest $2.63
+  date: 2026-11-23

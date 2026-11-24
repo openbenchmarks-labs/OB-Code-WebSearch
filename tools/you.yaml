@@ -10,6 +10,7 @@ setups:
       fetch_usd: 0.001
       fetch_source: https://you.com/docs/administration/billing (Contents API, $1.00 / 1k pages)
       fetch_date: 2026-11-23
+      answer_usd: {expected: 0.0263, max: 0.165, source: "17 Nov val run, 322 answers per mode, search_only 5.31 billed searches, search_and_fetch 4.85 searches + 1.82 fetches", date: 2026-11-23}
   you_highlights:
     mode: [search_only, search_and_fetch]
     class: main
@@ -20,6 +21,7 @@ setups:
       fetch_usd: 0.001
       fetch_source: https://you.com/docs/administration/billing (Contents API, $1.00 / 1k pages)
       fetch_date: 2026-11-23
+      answer_usd: {expected: 0.0251, max: 0.165, source: "28 Oct val run, 55 answers per mode, search_only 4.84 billed searches, search_and_fetch 4.62 searches + 2.98 fetches", date: 2026-11-23}
   you_highlights_core_documented:
     mode: search_only
     class: main
@@ -27,3 +29,4 @@ setups:
       list_usd: 0.005
       basis: list
       bills_empty: true
+      answer_usd: {expected: 0.025, max: 0.16, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}

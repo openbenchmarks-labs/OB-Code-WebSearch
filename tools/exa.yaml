@@ -10,6 +10,7 @@ setups:
       fetch_usd: 0.001
       fetch_source: https://exa.ai/pricing (Contents, $1 / 1k pages per content type; text only)
       fetch_date: 2026-11-23
+      answer_usd: {expected: 0.0375, max: 0.04, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-23}
   exa_auto_domains:
     mode: search_only
     class: main
@@ -17,6 +18,7 @@ setups:
       list_usd: 0.007
       basis: list
       bills_empty: false
+      answer_usd: {expected: 0.035, max: 0.035, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   exa_fast:
     mode: search_only
     class: main
@@ -26,6 +28,7 @@ setups:
       bills_empty: false
       source: https://exa.ai/docs/admin/pricing (/search fast, $7 / 1k requests)
       date: 2026-11-19
+      answer_usd: {expected: 0.0288, max: 0.035, source: "28 Oct val run, 55 answers, 4.11 billed searches each", date: 2026-11-23}
   exa_lite:
     mode: search_only
     class: main
@@ -33,6 +36,7 @@ setups:
       list_usd: 0.004
       basis: list
       bills_empty: false
+      answer_usd: {expected: 0.02, max: 0.02, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   exa_instant:
     mode: search_only
     class: main
@@ -40,3 +44,4 @@ setups:
       list_usd: 0.004
       basis: list
       bills_empty: false
+      answer_usd: {expected: 0.0171, max: 0.02, source: "28 Oct val run, 55 answers, 4.27 billed searches each", date: 2026-11-23}
