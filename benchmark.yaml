@@ -16,7 +16,7 @@ window_hours: 24
 # About 15 answers ran at once in the 17 Nov validation run (14 arms in 3 hours) without model or vendor rate limits.
 concurrency: 16
 repeats: 3
-budget_usd: 0
+budget_usd: 2500
 refresh_days: 30
 not_measured_max: 0.1
 judge_error_max: 0.05
