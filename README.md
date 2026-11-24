@@ -1,8 +1,8 @@
-# OB-Code-Websearch
+# OB-Code-WebSearch
 
 Open, independent benchmark of web search APIs for developers and coding agents: which search API helps a coding agent write working API calls for enterprise products (Workday, SAP, UKG, Veeva, Genesys and ServiceNow). The model, tickets, search budget and run day stay fixed; only the search tool changes. Search APIs measured: Brave, Exa, Firecrawl, Keenable, Linkup, Nimble, Parallel, Perplexity, SERP (RapidAPI), Tako, Tavily, TinyFish and You.com.
 
-**Live leaderboard:** [openbenchmarks.com/web-search-for-coding-agents](https://openbenchmarks.com/web-search-for-coding-agents) · **Public dataset:** [`openbenchmarks/OB-Code-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-Websearch)
+**Live leaderboard:** [openbenchmarks.com/web-search-for-coding-agents](https://openbenchmarks.com/web-search-for-coding-agents) · **Public dataset:** [`openbenchmarks/OB-Code-WebSearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-WebSearch)
 
 Published and maintained by **[OpenBenchmarks Labs](https://openbenchmarks.com)**.
 
@@ -22,7 +22,7 @@ Each task gives a coding agent a realistic integration ticket against an enterpr
 
 ## Dataset
 
-- **Public split:** 30 enterprise API tickets are committed in [`data/questions.jsonl`](data/questions.jsonl) and mirrored on Hugging Face at [`openbenchmarks/OB-Code-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-Websearch).
+- **Public split:** 30 enterprise API tickets are committed in [`data/questions.jsonl`](data/questions.jsonl) and mirrored on Hugging Face at [`openbenchmarks/OB-Code-WebSearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-WebSearch).
 - **Held-out split:** The private evaluation set used for the published leaderboard is kept out of this repository to prevent contamination and training on test items.
 
 See [`data/README.md`](data/README.md) for the full file format and field definitions.
@@ -57,7 +57,7 @@ Live runs go through [obkit](AGENTS.md), which reads API keys from `.env` (copy 
 
 - [Live leaderboard](https://openbenchmarks.com/web-search-for-coding-agents)
 - [Most accurate](https://openbenchmarks.com/web-search-for-coding-agents/most-accurate-search-api), [fastest](https://openbenchmarks.com/web-search-for-coding-agents/fastest-search-api) and [most token-efficient](https://openbenchmarks.com/web-search-for-coding-agents/most-token-efficient-search-api) search APIs for coding agents
-- [Hugging Face dataset](https://huggingface.co/datasets/openbenchmarks/OB-Code-Websearch)
+- [Hugging Face dataset](https://huggingface.co/datasets/openbenchmarks/OB-Code-WebSearch)
 - [`llms.txt`](https://openbenchmarks.com/llms.txt)
 
 ## Related benchmarks

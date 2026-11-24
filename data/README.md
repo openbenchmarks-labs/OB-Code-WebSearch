@@ -4,7 +4,7 @@ This folder holds the 30-question public split used for offline verification (`s
 
 ## Public vs. held-out evaluation sets
 
-- **Public split (`questions.jsonl`):** 30 enterprise API tickets covering Workday, SAP SuccessFactors, UKG, Veeva, Genesys Cloud, and ServiceNow. Also published on Hugging Face at [`openbenchmarks/OB-Code-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-Websearch).
+- **Public split (`questions.jsonl`):** 30 enterprise API tickets covering Workday, SAP SuccessFactors, UKG, Veeva, Genesys Cloud, and ServiceNow. Also published on Hugging Face at [`openbenchmarks/OB-Code-WebSearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-WebSearch).
 - **Held-out split (private):** The evaluation set used for the published leaderboard stays private so search tools and models cannot train on it.
 
 ## Files and schema
