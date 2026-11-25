@@ -310,17 +310,46 @@ def _entries(call: dict) -> list[str]:
     return [str(f) for f in call.get('fields') or []] + (path.split('?', 1)[1].split('&') if '?' in path else [])
 
 
+_PAIR = re.compile(r'(["\']?)([\w$@.\[\]/-]+)\1\s*([=:])\s*')
+_NEXT = re.compile(r'&|,\s*["\']?[\w$@.\[\]/-]+["\']?\s*[=:]')
+
+
+def _values(entry: str) -> list[tuple[str, str]]:
+    """(name, value) for each `name=value` or `"name": value` in an entry; the name is the last dotted, indexed or
+    slashed segment, so `postingStatuses[0].status=FAILED` gives ("status", "FAILED")."""
+    out = []
+    for m in _PAIR.finditer(entry):
+        rest = entry[m.end():]
+        if rest and rest[0] in '"\'':
+            raw = rest[1:].split(rest[0], 1)[0]
+        elif m.group(3) == '=':
+            raw = _NEXT.split(rest, 1)[0]
+        else:
+            raw = re.split(r'[,}\]]', rest, maxsplit=1)[0]
+        segments = [s for s in re.split(r'[.\[\]/]', m.group(2)) if s]
+        if segments:
+            out.append((_norm(segments[-1]), raw.strip().strip('"\'')))
+    return out
+
+
 def _gives(entry: str, field: str) -> bool:
     """Whether one entry names a field the key lists (`name`, or `name=value` when the ticket fixes the value). A
     name compares without case or punctuation against the entry's name and each dotted, indexed, spaced or quoted part
     of it (values too, since some agents write a whole body as one entry), so "device token", "deviceToken" and
-    "root.device_token" all name deviceToken. A value must appear, the same way, after the entry's first = or :."""
+    "root.device_token" all name deviceToken. A value must be the one given for that name in the entry, the same
+    without case or punctuation (a date may carry a time after it); a placeholder or a list of choices is no value."""
     name, _, value = field.partition('=')
-    parts = {_norm(entry.split('=', 1)[0])} | {_norm(p) for p in re.split(r'[\s.,:;=\[\]{}()"\'/]+', entry) if p}
-    if _norm(name) not in parts:
-        return False
-    given = re.split(r'[=:]', entry, maxsplit=1)
-    return not value or _norm(value) in _norm(given[-1])
+    if not value:
+        parts = {_norm(entry.split('=', 1)[0])} | {_norm(p) for p in re.split(r'[\s.,:;=\[\]{}()"\'/]+', entry) if p}
+        return _norm(name) in parts
+    want = _norm(value)
+    date = re.fullmatch(r'\d{4}-\d{2}-\d{2}', value)
+    for got_name, got in _values(entry):
+        if got_name != _norm(name) or '{' in got or '|' in got:
+            continue
+        if _norm(got) == want or (date and _norm(got).startswith(want)):
+            return True
+    return False
 
 
 def _gives_all(call: dict, right: dict) -> bool:
