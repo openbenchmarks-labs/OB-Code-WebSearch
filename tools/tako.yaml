@@ -1,6 +1,7 @@
 tool: tako
 setups:
   tako:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.007
@@ -8,6 +9,7 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.0325, max: 0.224, source: "28 Oct val run, 55 answers, 4.64 billed searches each", date: 2026-11-23}
   tako_plain:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.007
@@ -15,6 +17,7 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.035, max: 0.224, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   tako_snippet_3400:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.007

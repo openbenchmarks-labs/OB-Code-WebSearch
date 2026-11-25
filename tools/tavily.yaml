@@ -1,6 +1,7 @@
 tool: tavily
 setups:
   tavily_advanced:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: [search_only, search_and_fetch]
     pricing:
       list_usd: 0.016
@@ -11,6 +12,7 @@ setups:
       fetch_date: 2026-11-23
       answer_usd: {expected: 0.088, max: 0.528, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-23}
   tavily_basic:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: [search_only, search_and_fetch]
     pricing:
       list_usd: 0.008

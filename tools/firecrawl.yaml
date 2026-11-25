@@ -11,6 +11,7 @@ setups:
       fetch_date: 2026-11-23
       answer_usd: {expected: 0.0496, max: 0.075, source: "17 Nov val run, 322 answers per mode, search_only 4.72 billed searches, search_and_fetch 3.96 searches + 2.51 fetches", date: 2026-11-23}
   firecrawl_domains:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.01

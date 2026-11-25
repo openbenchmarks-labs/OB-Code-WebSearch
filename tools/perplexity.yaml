@@ -1,6 +1,7 @@
 tool: perplexity
 setups:
   perplexity_web_tool:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.005
@@ -8,6 +9,7 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.025, max: 0.16, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   perplexity_fast_tool:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.001
@@ -15,6 +17,7 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.005, max: 0.032, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   perplexity_web_tool_budget:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.005
@@ -22,6 +25,7 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.025, max: 0.16, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   perplexity_web_mcp:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.005
@@ -29,6 +33,7 @@ setups:
       bills_empty: true
       answer_usd: {expected: 0.025, max: 0.16, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   perplexity_web_tool_siteq:
+    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.005
