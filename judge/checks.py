@@ -248,7 +248,7 @@ LABEL_ALIAS = {'sectindex': 'sectionindex'}
 
 def _answer_keys(inside: str) -> str:
     """The keys in parentheses as label=value, sorted by label; a key written by position has an empty label. A value
-    is a placeholder ({}) when it is one, or empty; otherwise it is kept, so a key that fixes a value (('FULL')) needs it."""
+    is a placeholder ({}) when it is one, or empty; otherwise it is kept, so a key that fixes a value (('ACTIVE')) needs it."""
     out = []
     for part in inside.split(','):
         label, eq, value = part.partition('=')

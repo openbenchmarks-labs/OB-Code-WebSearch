@@ -1,6 +1,6 @@
 # STATUS
 
 - Owner: Aktan
-- State: runs through obkit 0.5.4 with the `scoring` block of benchmark.yaml; public, validation (r9.11) and private (r9.8) sets locked; every right call of a key, alternates included, lists the fields and values its ticket asks for, checked against the vendor docs; every setup outside the validated 8 is `excluded` in tools/
+- State: runs through obkit 0.5.5 with the `scoring` block of benchmark.yaml; public, validation (r9.12) and private (r9.9) sets locked; the right calls of a key list the fields and values its ticket asks for, checked against the vendor docs; a vendor's own outage that outlasts every attempt is its miss; every setup outside the validated 8 is `excluded` in tools/
 - Next step: the paid private run, on the setups the 17 and 20 Nov validation runs used (14 arms with modes, plus the no-search baseline; about 8 h at concurrency 16): `obkit go --set private --tools firecrawl,keenable_pro,keenable_realtime,nimble_standard,parallel_advanced_tool,parallel_fast_tool,tinyfish,you_highlights_core`
 - Open decisions: the private run date and the setup freeze date

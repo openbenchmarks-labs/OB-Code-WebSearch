@@ -109,7 +109,6 @@ def _shaping() -> list:
             run=run,
             conversation=conversation,
             backend=None,
-            provider="probe",
             max_searches=left,
             max_results=CONFIG["limits"]["results_per_search"],
             search_fn=lambda q: [dict(h) for h in PROBE_HITS],
@@ -358,7 +357,11 @@ def answer(question: dict, setup: str, *, dry: bool, tracer=None) -> dict:
         "output_tokens": run.llm_completion_tokens,
     }
     # run.error is set by a model failure or cut-off reply, or by a search failure the harness leaves unscored (search.py
-    # UNSCORED_FAILURES: ours, or an outage at the vendor); obkit asks such an answer again.
+    # UNSCORED_FAILURES: ours, or an outage at the vendor); obkit asks such an answer again. The agent stops at the call
+    # that set it, and when that call failed for the vendor's own outage (VENDOR_FAULTS), obkit scores the answer's last
+    # attempt as the vendor's miss.
+    fault = bool(run.error) and any(
+        call.error == run.error and call.failure_class in vendors.VENDOR_FAULTS for call in [*run.searches, *run.fetches])
     if run.error:
         status = "infra_error"
     elif sent and all(call.error for call in sent):
@@ -373,6 +376,7 @@ def answer(question: dict, setup: str, *, dry: bool, tracer=None) -> dict:
         "error": run.error,
         "cost_usd": round(llm_cost + vendor_cost, 6),
         "facts": cost_facts,
+        **({"vendor_fault": True} if fault else {}),
     }
 
 
