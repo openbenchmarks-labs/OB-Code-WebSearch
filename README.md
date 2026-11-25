@@ -1,8 +1,8 @@
 # OB-Code-Websearch
 
-Open, independent benchmark of web search APIs for developers and coding agents: which search API helps a coding agent write working API calls for enterprise products (Workday, SAP, UKG, Veeva, Genesys and ServiceNow). The model, tickets, search budget and run day stay fixed; only the search tool changes. Search APIs measured: Brave, Exa, Firecrawl, Keenable, Linkup, Nimble, Parallel, Perplexity, SERP (RapidAPI), Tako, Tavily, TinyFish and You.com.
+Open, independent benchmark of web search APIs for developers and coding agents: which search API helps a coding agent write working API calls for enterprise products (Workday, SAP, UKG, Veeva, Genesys and ServiceNow). The model, tickets, search budget and run day stay fixed; only the search tool changes. Version 2 measures six search APIs, the ones its validation runs used: Firecrawl, Keenable, Nimble, Parallel, TinyFish and You.com.
 
-**Live leaderboard:** [openbenchmarks.com/web-search-for-coding-agents](https://openbenchmarks.com/web-search-for-coding-agents) · **Public dataset:** [`openbenchmarks/OB-Code-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-Websearch)
+**Live leaderboard (version 1):** [openbenchmarks.com/web-search-for-coding-agents](https://openbenchmarks.com/web-search-for-coding-agents) · **Public dataset:** [`openbenchmarks/OB-Code-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-Websearch)
 
 Published and maintained by **[OpenBenchmarks Labs](https://openbenchmarks.com)**.
 
@@ -14,16 +14,16 @@ Each task gives a coding agent a realistic integration ticket against an enterpr
 - **Fixed protocol:** Every tool runs with the same coding model, turn limit, search budget, and day (`harness/config.yaml`).
 - **Scoring:** `judge/` grades each final answer against ground truth; [`judge/README.md`](judge/README.md#what-the-answer-grader-checks) says what the answer grader in this repo checks and what it does not. The `scoring` block in [`benchmark.yaml`](benchmark.yaml) sets how a board sums the grades: ranked questions (an answer page open to crawlers) run three times and score the share of runs that pass; the original and reserve groups are weighted; questions with no open answer page run once and are reported beside the ranking; each score has a 95% bootstrap range, and no setup is called better than another when the ranges overlap.
 
-## Tools evaluated
+## Tools
 
-13 search tools configured in [`tools/`](tools/README.md):
+The version 2 private run uses the 8 setups in [`STATUS.md`](STATUS.md): `firecrawl`, `keenable_pro`, `keenable_realtime`, `nimble_standard`, `parallel_advanced_tool`, `parallel_fast_tool`, `tinyfish` and `you_highlights_core`.
 
-`brave`, `exa`, `firecrawl`, `keenable`, `linkup`, `nimble`, `parallel`, `perplexity`, `serp`, `tako`, `tavily`, `tinyfish`, `you`
+[`tools/`](tools/README.md) configures 13 search tools, the six above plus `brave`, `exa`, `linkup`, `perplexity`, `serp`, `tako` and `tavily`, which version 2 does not run.
 
 ## Dataset
 
-- **Public split:** 30 enterprise API tickets are committed in [`data/questions.jsonl`](data/questions.jsonl) and mirrored on Hugging Face at [`openbenchmarks/OB-Code-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-Websearch).
-- **Held-out split:** The private evaluation set used for the published leaderboard is kept out of this repository to prevent contamination and training on test items.
+- **Public split:** 30 enterprise API tickets are committed in [`data/questions.jsonl`](data/questions.jsonl). The Hugging Face dataset [`openbenchmarks/OB-Code-Websearch`](https://huggingface.co/datasets/openbenchmarks/OB-Code-Websearch) still holds the version 1 file; the version 2 questions are in review there.
+- **Held-out split:** The validation and private sets are kept out of this repository to prevent contamination and training on test items; `benchmark.yaml` names each by its sha256.
 
 See [`data/README.md`](data/README.md) for the full file format and field definitions.
 
