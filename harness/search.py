@@ -76,15 +76,15 @@ KEENABLE_SEARCH_URL = "https://api.keenable.ai/v1/search"
 # ours (a local error, our network, our key or account, a redirect, a 429 from our key's rate limit or our concurrency)
 # and an outage at the vendor (VENDOR_FAULTS).
 # `served_mode_mismatch`: the vendor served another mode than the lane sent, so the row would measure a different
-# product.
+# product; it is asked again, and on the last attempt it is the vendor's miss like an outage.
 UNSCORED_FAILURES = frozenset({"local_error", "local_network", "auth_configuration", "redirect_not_followed",
                                "account_billing", "transport_error", "rate_limit", "vendor_server",
                                "served_mode_mismatch"})
-# The vendor's own outage: a 5xx or 408, or a timeout or reset with no HTTP status, on a search. obkit scores such an
-# answer as the vendor's miss on its last attempt; left unscored, it would drop from the vendor's score the questions
-# it fails on. A 402 is our account's credit, not the vendor's fault: three in a row stop the setup (`halt_after`), and
-# a setup left with more than `unfinished_max` unfinished questions is reported but not ranked.
-VENDOR_FAULTS = frozenset({"vendor_server", "transport_error"})
+# The vendor's own failure to serve the search: a 5xx or 408, a timeout or reset with no HTTP status, or another mode
+# than the one sent. obkit scores such an answer as the vendor's miss on its last attempt; left unscored, it would drop
+# from the vendor's score the questions it fails on. A 402 is our account's credit, not the vendor's fault: three in a
+# row stop the setup (`halt_after`), and obkit refuses a board where a setup's unscored rows pass `not_measured_max`.
+VENDOR_FAULTS = frozenset({"vendor_server", "transport_error", "served_mode_mismatch"})
 # Errors our own machine raises before any byte reaches the vendor: a name lookup, no route, no file handles.
 LOCAL_NETWORK = ("NameResolutionError", "Failed to resolve", "nodename nor servname", "Name or service not known",
                  "No route to host", "Network is unreachable", "Too many open files")
