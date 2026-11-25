@@ -58,6 +58,73 @@ WEB_FETCH_TOOL = {
 }
 
 
+MAX_CONVERSATION_CHARS = 48_000
+KEEP_RECENT_TOOL_OUTPUTS = 2
+
+
+def compact_conversation(
+    conversation: list[dict[str, Any]],
+    *,
+    max_chars: int = MAX_CONVERSATION_CHARS,
+    keep_recent: int = KEEP_RECENT_TOOL_OUTPUTS,
+) -> None:
+    """Prunes redundant search snippets and stale fetch bodies from older turns when context budget is exceeded."""
+    total_chars = sum(len(str(item.get("output") or item.get("content") or "")) for item in conversation)
+    if total_chars <= max_chars:
+        return
+
+    # Identify all function_call_output indices
+    tool_indices = [
+        i for i, item in enumerate(conversation)
+        if item.get("type") == "function_call_output" and "output" in item
+    ]
+    if len(tool_indices) <= keep_recent:
+        return
+
+    # Candidates for compaction are tool outputs prior to the most recent ones
+    candidates = tool_indices[:-keep_recent]
+
+    for idx in candidates:
+        item = conversation[idx]
+        raw_output = item.get("output", "")
+        if not raw_output or len(raw_output) < 300:
+            continue
+        try:
+            payload = json.loads(raw_output)
+        except Exception:
+            continue
+
+        if not isinstance(payload, dict):
+            continue
+
+        changed = False
+
+        # 1. Compact older web_fetch bodies
+        if "content" in payload and isinstance(payload["content"], str):
+            content = payload["content"]
+            if len(content) > 300:
+                payload["content"] = content[:150] + "\n... [page content trimmed for context window; URL preserved]"
+                changed = True
+
+        # 2. Compact older web_search hits
+        if "hits" in payload and isinstance(payload["hits"], list):
+            new_hits = []
+            for hit in payload["hits"]:
+                if isinstance(hit, dict):
+                    snippet = str(hit.get("snippet") or "")
+                    if len(snippet) > 150:
+                        hit = {**hit, "snippet": snippet[:100] + "..."}
+                        changed = True
+                    new_hits.append(hit)
+                else:
+                    new_hits.append(hit)
+            if changed:
+                payload["hits"] = new_hits
+
+        if changed:
+            item["output"] = json.dumps(payload, ensure_ascii=False)
+
+
 @dataclass
 class SearchCall:
     query: str
@@ -137,6 +204,7 @@ def run_agent(
     # searches, which do not use one of the max_searches, are still capped by max_turns. When the turns run out with the
     # model still calling tools, it gets one more turn with tools off to give its answer.
     def ask(tools_off: bool) -> Any:
+        compact_conversation(conversation)
         llm_started = time.perf_counter()
         request = {
             "model": model, "reasoning": {"effort": reasoning_effort}, "include": ["reasoning.encrypted_content"],
