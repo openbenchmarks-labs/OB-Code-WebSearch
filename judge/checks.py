@@ -12,19 +12,39 @@ from pathlib import Path
 
 DRIVER = r'''
 import importlib.util, inspect, json, os, re, sys, threading
+import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, parse_qs
 
 SEEN = []
 
 
-def keys(data, at=""):
-    """Every field name in a JSON body, nested ones as dotted paths (items.quantity)."""
+def json_body(data, at=""):
+    """Every field name in a JSON body, nested ones as dotted paths (items.quantity), and each scalar as path=value."""
     if isinstance(data, list):
-        return {k for item in data for k in keys(item, at)}
+        parts = [json_body(item, at) for item in data]
+        return [n for p in parts for n in p[0]], [v for p in parts for v in p[1]]
     if not isinstance(data, dict):
-        return set()
-    return {f"{at}{k}" for k in data} | {k for name, v in data.items() for k in keys(v, f"{at}{name}.")}
+        return [], ([f"{at[:-1]}={data}"] if at else [])
+    names, values = [f"{at}{k}" for k in data], []
+    for k, v in data.items():
+        n, vals = json_body(v, f"{at}{k}.")
+        names, values = names + n, values + vals
+    return names, values
+
+
+def xml_body(el, at=""):
+    """The same for the elements under a SOAP request element, by local name."""
+    names, values = [], []
+    for child in el:
+        path = at + child.tag.rsplit("}", 1)[-1]
+        names.append(path)
+        if len(child):
+            n, v = xml_body(child, path + ".")
+            names, values = names + n, values + v
+        elif (child.text or "").strip():
+            values.append(f"{path}={child.text.strip()}")
+    return names, values
 
 
 class Stand(BaseHTTPRequestHandler):
@@ -33,17 +53,23 @@ class Stand(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(n).decode("utf-8", "replace") if n else ""
         u = urlsplit(self.path)
-        body_keys, soap = [], None
+        body_keys, body_values, soap = [], [], None
         if raw.lstrip().startswith("<"):
             m = re.search(r"<(?:[\w-]+:)?Body\b[^>]*>\s*<(?:[\w-]+:)?([A-Za-z]\w*)", raw)
             soap = m.group(1) if m else None
+            try:
+                body = next(e for e in ET.fromstring(raw).iter() if e.tag.rsplit("}", 1)[-1] == "Body")
+                body_keys, body_values = xml_body(body[0])
+            except (ET.ParseError, StopIteration, IndexError):
+                pass
         elif raw:
             try:
-                body_keys = sorted(keys(json.loads(raw)))
+                body_keys, body_values = json_body(json.loads(raw))
             except ValueError:
                 body_keys = sorted(parse_qs(raw))
+                body_values = [f"{k}={v[0]}" for k, v in parse_qs(raw).items()]
         SEEN.append({"method": self.command.lower(), "path": u.path, "query": {k: v[0] for k, v in parse_qs(u.query).items()},
-                     "body_keys": body_keys, "soap": soap})
+                     "body_keys": sorted(set(body_keys)), "body_values": body_values, "soap": soap})
         xml = raw.lstrip().startswith("<")
         out = (b"<soapenv:Envelope xmlns:soapenv='http://schemas.xmlsoap.org/soap/envelope/'><soapenv:Body/></soapenv:Envelope>" if xml else b"{}")
         self.send_response(200)
@@ -167,14 +193,14 @@ ANSWER_SCHEMA = {
             "path": {"type": "string", "description": "Address path after the host, as the docs write it; a value the caller supplies as {name}."},
             "operation": {"type": "string", "description": "For SOAP, the request element (for example Get_Workers_Request); empty otherwise."},
             "fields": {"type": "array", "items": {"type": "string"},
-                       "description": "Query parameters or body fields the ticket needs sent, as name, or name=value when the docs fix the value (for example $expand=someNavigation); empty if none."},
+                       "description": "Query parameters or body fields (SOAP: request elements) the ticket needs sent, as name, or name=value when the ticket or the docs fix the value (for example $expand=someNavigation); empty if none."},
         },
         "required": ["method", "path", "operation", "fields"],
         "additionalProperties": False,
     },
 }
 
-_RULES = """Answer with the request only: method, path, SOAP operation if the API is SOAP, and the query parameters or body fields the ticket needs. Do not write code. Write any value the caller supplies as {name}. When the docs fix a value the ticket needs (a navigation to expand, an action name), give it as name=value."""
+_RULES = """Answer with the request only: method, path, SOAP operation if the API is SOAP, and the query parameters or body fields (for SOAP, the request elements) the ticket needs. Do not write code. Write any value the caller supplies as {name}. When the ticket or the docs fix a value (a name, a date, a status, a navigation to expand, an action name), give it as name=value."""
 SYSTEM = f"""You find the exact API request a ticket needs in the vendor's current public documentation.
 You have web_search and web_fetch. You must call web_search before you answer. Do not rely on memory for paths, operation names or field names: use a name only if you saw it in a result. Fetch a specific URL when snippets are not enough. If you are unsure, search again; using more of the search budget is better than a wrong answer.
 {_RULES}"""
@@ -271,26 +297,35 @@ def _rest_matches(call: dict, right: dict) -> bool:
     need = ([right['require_query']] if right.get('require_query') else []) + _expands(right['address'])
     if not all(re.search(r'(?:^|[?&\s])\$?expand=[^&\s]*\b' + re.escape(n) + r'\b', query, re.I) for n in need):
         return False
-    named = _named(call)
-    return all(_norm(f) in named for f in right.get('fields') or [])
+    return _gives_all(call, right)
 
 
 def _norm(name: str) -> str:
     return re.sub(r'[^a-z0-9]', '', name.lower())
 
 
-def _named(call: dict) -> set[str]:
-    """Every name the call gives, without case or punctuation: each field and query parameter, and each dotted,
-    indexed, spaced or quoted part of it (values too, since some agents write a whole body as one field), so
-    "device token", "deviceToken" and "root.device_token" all name deviceToken."""
+def _entries(call: dict) -> list[str]:
+    """The call's fields and the parameters in its path's query string."""
     path = str(call.get('path') or '')
-    items = [str(f) for f in call.get('fields') or []] + (path.split('?', 1)[1].split('&') if '?' in path else [])
-    out = set()
-    for item in items:
-        name = item.split('=', 1)[0]
-        out.add(_norm(name))
-        out.update(_norm(part) for part in re.split(r'[\s.,:;=\[\]{}()"\'/]+', item) if part)
-    return out
+    return [str(f) for f in call.get('fields') or []] + (path.split('?', 1)[1].split('&') if '?' in path else [])
+
+
+def _gives(entry: str, field: str) -> bool:
+    """Whether one entry names a field the key lists (`name`, or `name=value` when the ticket fixes the value). A
+    name compares without case or punctuation against the entry's name and each dotted, indexed, spaced or quoted part
+    of it (values too, since some agents write a whole body as one entry), so "device token", "deviceToken" and
+    "root.device_token" all name deviceToken. A value must appear, the same way, after the entry's first = or :."""
+    name, _, value = field.partition('=')
+    parts = {_norm(entry.split('=', 1)[0])} | {_norm(p) for p in re.split(r'[\s.,:;=\[\]{}()"\'/]+', entry) if p}
+    if _norm(name) not in parts:
+        return False
+    given = re.split(r'[=:]', entry, maxsplit=1)
+    return not value or _norm(value) in _norm(given[-1])
+
+
+def _gives_all(call: dict, right: dict) -> bool:
+    entries = _entries(call)
+    return all(any(_gives(e, field) for e in entries) for field in right.get('fields') or [])
 
 
 def grade(accepted: list[dict], answer: str | dict | None) -> bool:
@@ -307,7 +342,8 @@ def grade(accepted: list[dict], answer: str | dict | None) -> bool:
         if right.get('soap'):
             # the call must be sent to a service that publishes the operation; a key lists one right answer per service
             sent_to = [x.lower() for x in re.split(r'[/?]', call.get('path') or '')]
-            if call.get('operation') and _op(call['operation']) == _op(right['soap']) and _service(right['address']) in sent_to:
+            if (call.get('operation') and _op(call['operation']) == _op(right['soap'])
+                    and _service(right['address']) in sent_to and _gives_all(call, right)):
                 return True
         elif _rest_matches(call, right):
             return True
