@@ -355,8 +355,9 @@ class ParallelFastTool(ParallelFast):
 
 
 class ParallelAdvancedTool(ParallelFastTool):
-    """Settings option: Parallel's higher-accuracy search mode, search only. Parallel's API defaults to `advanced`
-    when `mode` is omitted (parallel-api-search.md:262-265). One 60 s search timeout, as every lane."""
+    """Parallel's higher-accuracy search mode, run with and without its Extract fetch as in the 20 Nov validation run.
+    Parallel's API defaults to `advanced` when `mode` is omitted (parallel-api-search.md:262-265). One 60 s search
+    timeout, as every lane."""
 
     name = "parallel_advanced_tool"
     mode = "advanced"
