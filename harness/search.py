@@ -72,12 +72,22 @@ TINYFISH_FETCH_TIMEOUT_S = 150
 TAKO_SEARCH_URL = "https://tako.com/api/v3/search"
 PERPLEXITY_SEARCH_URL = "https://api.perplexity.ai/search"
 KEENABLE_SEARCH_URL = "https://api.keenable.ai/v1/search"
-# Failures on our side: the attempt stops and is not scored against the search tool. A transport failure (TLS,
-# connection reset, no HTTP status) is ours; a 429 is our key's rate limit or our concurrency.
+# Failures that stop the attempt without a score, so the answer is asked again (up to the scoring block's `attempts`):
+# ours (a local error, our network, our key or account, a redirect, a 429 from our key's rate limit or our concurrency)
+# and an outage at the vendor (VENDOR_FAULTS).
 # `served_mode_mismatch`: the vendor served another mode than the lane sent, so the row would measure a different
 # product.
-UNSCORED_FAILURES = frozenset({"local_error", "auth_configuration", "redirect_not_followed", "account_billing",
-                               "transport_error", "rate_limit", "vendor_server", "served_mode_mismatch"})
+UNSCORED_FAILURES = frozenset({"local_error", "local_network", "auth_configuration", "redirect_not_followed",
+                               "account_billing", "transport_error", "rate_limit", "vendor_server",
+                               "served_mode_mismatch"})
+# The vendor's own outage: a 5xx or 408, or a timeout or reset with no HTTP status, on a search. obkit scores such an
+# answer as the vendor's miss on its last attempt; left unscored, it would drop from the vendor's score the questions
+# it fails on. A 402 is our account's credit, not the vendor's fault: three in a row stop the setup (`halt_after`), and
+# a setup left with more than `unfinished_max` unfinished questions is reported but not ranked.
+VENDOR_FAULTS = frozenset({"vendor_server", "transport_error"})
+# Errors our own machine raises before any byte reaches the vendor: a name lookup, no route, no file handles.
+LOCAL_NETWORK = ("NameResolutionError", "Failed to resolve", "nodename nor servname", "Name or service not known",
+                 "No route to host", "Network is unreachable", "Too many open files")
 DEFAULT_MAX_RESULTS = 8
 DEFAULT_MAX_FETCH_CHARS = 16000
 FETCH_TIMEOUT_S = 90
@@ -1904,14 +1914,15 @@ def vendor_request(
 
 
 def classify_failure(meta: dict[str, Any], error: str | None) -> str | None:
-    """Classify the observed boundary, without guessing who caused a timeout."""
+    """Classify the observed boundary. A failure with no HTTP status is our network when our machine never reached
+    the vendor (LOCAL_NETWORK), else the vendor's transport: a timeout or a reset."""
     if not error:
         return None
     if not meta.get("request"):
         return "local_error"
     status = meta.get("http_status")
     if status is None:
-        return "transport_error"
+        return "local_network" if any(mark in error for mark in LOCAL_NETWORK) else "transport_error"
     if meta.get("served_mode_mismatch"):
         return "served_mode_mismatch"
     if meta.get("upstream_status") in (401, 403):

@@ -13,6 +13,8 @@ from pathlib import Path
 DRIVER = r'''
 import importlib.util, inspect, json, os, re, sys, threading
 import xml.etree.ElementTree as ET
+from email import policy
+from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, parse_qs
 
@@ -51,9 +53,11 @@ class Stand(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def _any(self):
         n = int(self.headers.get("Content-Length") or 0)
-        raw = self.rfile.read(n).decode("utf-8", "replace") if n else ""
+        data = self.rfile.read(n) if n else b""
+        raw = data.decode("utf-8", "replace")
         u = urlsplit(self.path)
         body_keys, body_values, soap = [], [], None
+        ctype = self.headers.get("Content-Type") or ""
         if raw.lstrip().startswith("<"):
             m = re.search(r"<(?:[\w-]+:)?Body\b[^>]*>\s*<(?:[\w-]+:)?([A-Za-z]\w*)", raw)
             soap = m.group(1) if m else None
@@ -62,6 +66,13 @@ class Stand(BaseHTTPRequestHandler):
                 body_keys, body_values = xml_body(body[0])
             except (ET.ParseError, StopIteration, IndexError):
                 pass
+        elif ctype.startswith("multipart/form-data"):
+            form = BytesParser(policy=policy.default).parsebytes(f"Content-Type: {ctype}\r\n\r\n".encode() + data)
+            for part in form.iter_parts():
+                name = part.get_param("name", header="content-disposition")
+                body_keys.append(name)
+                if not part.get_filename():
+                    body_values.append(f"{name}={part.get_content().strip()}")
         elif raw:
             try:
                 body_keys, body_values = json_body(json.loads(raw))
@@ -180,7 +191,7 @@ def recorded(row: dict, which: str) -> dict:
 
 
 VENDORS = {"gen": "Genesys Cloud", "sf": "SAP SuccessFactors", "sap": "SAP S/4HANA Cloud", "sn": "ServiceNow",
-           "ukg": "UKG Pro Workforce Management", "wd": "Workday", "vv": "Veeva Vault"}
+           "ukg": "UKG Pro Workforce Management", "wd": "Workday", "wds": "Workday", "vv": "Veeva Vault"}
 
 ANSWER_SCHEMA = {
     "type": "json_schema",
@@ -236,8 +247,22 @@ LABEL_ALIAS = {'sectindex': 'sectionindex'}
 
 
 def _answer_keys(inside: str) -> str:
-    labels = (x.split('=')[0].strip().lower() for x in inside.split(',') if '=' in x)
-    return '(' + ','.join(sorted(LABEL_ALIAS.get(l, l) for l in labels)) + ')'
+    """The keys in parentheses as label=value, sorted by label; a key written by position has an empty label. A value
+    is a placeholder ({}) when it is one, or empty; otherwise it is kept, so a key that fixes a value (('ACTIVE')) needs it."""
+    out = []
+    for part in inside.split(','):
+        label, eq, value = part.partition('=')
+        if not eq:
+            label, value = '', part
+        label = label.strip().lower()
+        out.append(f'{LABEL_ALIAS.get(label, label)}={_key_value(value)}')
+    return '(' + ','.join(sorted(out)) + ')'
+
+
+def _key_value(value: str) -> str:
+    value = re.sub(r"^(datetime|guid)(?=')", '', value.strip(), flags=re.I).strip('\'"')
+    value = re.sub(r'^(\d+)[lL]$', r'\1', value)
+    return '{}' if not value or '{' in value else value.lower()
 
 
 def _segments(path: str) -> list[str]:
@@ -285,7 +310,7 @@ def _same(got: list[str], want: list[str]) -> bool:
 
 
 def _part(segment: str) -> str:
-    return '[^/]+'.join(re.escape(p) for p in re.split(r'\{[^}]*\}', segment))
+    return '[^/,()]+'.join(re.escape(p) for p in re.split(r'\{[^}]*\}', segment))
 
 
 def _rest_route(call: dict, right: dict) -> bool:

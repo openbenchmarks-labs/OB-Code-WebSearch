@@ -11,6 +11,7 @@ from typing import Any
 from .search import (
     QUERY_PARAMETER,
     UNSCORED_FAILURES,
+    VENDOR_FAULTS,
     SearchBackend,
     classify_failure,
     fit_search_budget,
@@ -122,7 +123,6 @@ def run_agent(
     fetch_fn: Callable[[str, str], dict[str, str]] | None = None,
 ) -> AgentRun:
     backend = get_backend(backend_name) if allow_search and not search_fn else None
-    provider = backend.name if backend is not None else backend_name
     run = AgentRun()
     conversation: list[dict[str, Any]] = [
         {"role": "system", "content": system},
@@ -164,6 +164,11 @@ def run_agent(
                 tool_names=[_call_name(call) for call in _function_calls(response)],
             )
         )
+        if getattr(response, "status", None) == "incomplete":
+            # A reply cut at max_output_tokens is our limit, not the vendor's miss: no score, and the answer is asked again.
+            details = getattr(response, "incomplete_details", None)
+            run.error = f"model reply incomplete: {getattr(details, 'reason', None) or details}"
+            return None
         return response
 
     extra_search_turns = 0
@@ -198,7 +203,6 @@ def run_agent(
                     run=run,
                     conversation=conversation,
                     backend=backend,
-                    provider=provider,
                     max_searches=max_searches,
                     max_results=max_results,
                     search_fn=search_fn,
@@ -263,7 +267,6 @@ def _run_search(
     run: AgentRun,
     conversation: list[dict[str, Any]],
     backend: SearchBackend | None,
-    provider: str,
     max_searches: int,
     max_results: int,
     search_fn: Callable[[str], list[dict[str, str]]] | None,
@@ -341,9 +344,6 @@ def _run_search(
             f": {vendor_text}" if vendor_text else "")
         if hop.failure_class in UNSCORED_FAILURES:
             run.error = error
-        if hop.failure_class == "account_billing":
-            # Out of credit fails every later search of this vendor: stop the round, so no attempt is scored on it.
-            raise BudgetStop(f"{provider} account out of credit (HTTP {hop.http_status})")
     conversation.append(_tool_output(call, tool_result))
 
 
@@ -399,7 +399,9 @@ def _run_fetch(
     }
     if error:
         fetch_result["error"] = f"fetch failed ({hop.failure_class}, HTTP {hop.http_status})"
-        if hop.failure_class in UNSCORED_FAILURES:
+        # One page the fetch API could not serve is like any other page it could not read: the model sees the error
+        # and goes on. Only a search outage stops the attempt and, on the last one, counts as the vendor's miss.
+        if hop.failure_class in UNSCORED_FAILURES - VENDOR_FAULTS:
             run.error = error
     conversation.append(_tool_output(call, fetch_result))
 
@@ -463,10 +465,6 @@ def _item_as_input(item: Any) -> Any:
         return item.model_dump(exclude_none=True) if hasattr(item, "model_dump") else item
     get = item.get if isinstance(item, dict) else lambda name: getattr(item, name, None)
     return {name: _item_as_input(get(name)) for name in names if get(name) is not None}
-
-
-class BudgetStop(RuntimeError):
-    """The vendor account is out of credit; the round stops here."""
 
 
 def _tool_output(call: Any, payload: dict[str, Any]) -> dict[str, Any]:

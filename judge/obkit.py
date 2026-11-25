@@ -154,8 +154,8 @@ def _shows(right: dict, page: str) -> bool:
 
 
 def key_check(question: dict):
-    """True when an accepted request appears on its docs page, False when every page was read and none shows one,
-    None when a page needs a browser."""
+    """True when an accepted request appears on its docs page (any one of the key's accepted calls is enough), a reason
+    string when every page was read and none shows one, None when a page needs a browser."""
     key = question["retrieval_key"]
     pages = [_page(url) for url in (key.get("docs") or [question["source_url"]])]
     readable = [page for page in pages if page is not None]

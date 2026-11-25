@@ -1,11 +1,11 @@
 name: OB-Code-Websearch
 serves: Teams choosing a web search API as the search step of a coding agent that writes code against enterprise product APIs (Workday, SAP, UKG, Veeva, Genesys, ServiceNow).
-win: The search API with which the agent scores highest on the ranked held-out questions with a request the ground truth accepts (each question scores the share of its three runs that pass; the original group weighs 70% and the reserve group 30%), under the same model, budget, and day; no setup is called better than another when their 95% ranges overlap.
-obkit: 0.5.4
+win: The search API with which the agent scores highest on the ranked held-out questions with a request the ground truth accepts (each question scores the share of its scored runs that pass, three runs on the private set; the original group weighs 70% and the reserve group 30%), under the same model, budget, and day; no setup is called better than another when their 95% ranges overlap.
+obkit: 0.5.5
 sets:
   public: {path: data/questions.jsonl}
-  validation: {sha256: 94d2c754ed5bcd518a76eae4947d8b2087002a34c4855e7af24009ec6e2a70df}
-  private: {sha256: f604569c80d76910b86e1e70fba47317282bca43bf57ab25418cdef108fbe360}
+  validation: {sha256: 8b18cc4eea7cb6869bc472f592fa733194bbdcbbdbfb451e84fe25e41b5278a5}
+  private: {sha256: d5a760b4c67fefc464bf2413da0256aec3a38313f1bba427ad0373f277cb4b4e}
 question_id: task_id
 split_axes: [vendor, kind]
 split_gap_max: 0.1
