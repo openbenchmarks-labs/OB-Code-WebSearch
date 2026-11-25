@@ -139,7 +139,7 @@ def run_agent(
     def ask(tools_off: bool) -> Any:
         llm_started = time.perf_counter()
         request = {
-            "model": model, "reasoning": {"effort": reasoning_effort},
+            "model": model, "reasoning": {"effort": reasoning_effort}, "include": ["reasoning.encrypted_content"],
             "tools": tools, "input": conversation, "max_output_tokens": 4000, "store": False,
             "text": {"format": text_format}, **({"tool_choice": "none"} if tools_off else {}),
         }
@@ -438,24 +438,31 @@ def _call_args(call: Any) -> dict[str, Any]:
 
 
 def _append_model_output(conversation: list[dict[str, Any]], response: Any) -> None:
+    """Every output item goes back in order, the encrypted reasoning included, as a coding agent keeps its own turns
+    (store is off, so the reasoning travels in the request)."""
     for item in getattr(response, "output", None) or []:
-        if _item_type(item) in {"reasoning", "message"}:
-            continue
         conversation.append(_item_as_input(item))
 
 
-def _item_as_input(item: Any) -> dict[str, Any]:
-    if isinstance(item, dict):
-        return item
-    payload = {
-        "type": getattr(item, "type", None),
-        "id": getattr(item, "id", None),
-        "call_id": getattr(item, "call_id", None),
-        "name": getattr(item, "name", None),
-        "arguments": getattr(item, "arguments", None),
-        "status": getattr(item, "status", None),
-    }
-    return {key: value for key, value in payload.items() if value is not None}
+# The fields the Responses API takes back as input, per item type; anything else a deployment adds stays out.
+_INPUT_FIELDS = {
+    "function_call": ("type", "id", "call_id", "name", "arguments", "status"),
+    "reasoning": ("type", "id", "summary", "encrypted_content"),
+    "message": ("type", "id", "role", "status", "content", "phase"),
+    "summary_text": ("type", "text"),
+    "output_text": ("type", "text", "annotations"),
+}
+
+
+def _item_as_input(item: Any) -> Any:
+    if isinstance(item, list):
+        return [_item_as_input(part) for part in item]
+    kind = item.get("type") if isinstance(item, dict) else getattr(item, "type", None)
+    names = _INPUT_FIELDS.get(str(kind))
+    if names is None:
+        return item.model_dump(exclude_none=True) if hasattr(item, "model_dump") else item
+    get = item.get if isinstance(item, dict) else lambda name: getattr(item, name, None)
+    return {name: _item_as_input(get(name)) for name in names if get(name) is not None}
 
 
 class BudgetStop(RuntimeError):
