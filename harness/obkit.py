@@ -22,8 +22,6 @@ from . import search as vendors
 
 HERE = Path(__file__).resolve().parent
 CONFIG = yaml.safe_load((HERE / "config.yaml").read_text())
-AZURE_KEY_ENV = "AZURE_OPENAI_NEXTGEN_DEPLOYMENT_KEY"
-AZURE_URL_ENV = "AZURE_OPENAI_NEXTGEN_DEPLOYMENT_URL"
 CANNED_PASS_PERCENT = {"no_search": 30, "exa_fast": 75, "parallel_fast": 60}
 CANNED_FACTS = {
     "llm_cost_usd": 0.0,
@@ -304,16 +302,12 @@ def load_environment() -> None:
 
 
 def make_llm_client(*, timeout: float, max_retries: int):
-    """Azure Foundry OpenAI-v1 deployment when NEXTGEN env is set, else native OpenAI."""
+    """OpenAI's API, as the 17 and 20 Nov validation runs used; the Azure deployment has no gpt-6-sol."""
     from openai import OpenAI
 
-    azure_url = (os.environ.get(AZURE_URL_ENV) or "").rstrip("/")
-    azure_key = os.environ.get(AZURE_KEY_ENV) or ""
-    if azure_url and azure_key:
-        return OpenAI(base_url=azure_url, api_key=azure_key, timeout=timeout, max_retries=max_retries)
     key = os.environ.get("OPENAI_API_KEY") or ""
     if not key:
-        raise SystemExit(f"set {AZURE_URL_ENV} + {AZURE_KEY_ENV} (preferred) or OPENAI_API_KEY")
+        raise SystemExit("set OPENAI_API_KEY")
     return OpenAI(api_key=key, timeout=timeout, max_retries=max_retries)
 
 
