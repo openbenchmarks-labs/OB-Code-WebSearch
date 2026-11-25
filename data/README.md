@@ -20,5 +20,5 @@ This folder holds the 30-question public split used for offline verification (`s
 | `prompt` | string | The full task prompt; the question the agent gets takes its ticket sentences from it. |
 | `starter_code` | string | The existing code; the question shows the request it sends today, not the code. |
 | `gold_code` | string | The reference fix: the code with the request the ticket needs. |
-| `retrieval_key` | object | Ground truth. `accepted` lists the right calls (method, address, Workday SOAP operation, and the `fields` the ticket asks for), which `judge/checks.py` grades against; `docs` lists the pages that show them, which `key_check` reads. |
+| `retrieval_key` | object | Ground truth. `accepted` lists the right calls (method, address, Workday SOAP operation, and the `fields` the key checks), which `judge/checks.py` grades against; `docs` lists the pages that show them, which `key_check` reads. |
 | `source_url` | string | The main documentation page; `key_check` reads it when the key lists no `docs`. |
