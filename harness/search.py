@@ -87,7 +87,8 @@ UNSCORED_FAILURES = frozenset({"local_error", "local_network", "auth_configurati
 VENDOR_FAULTS = frozenset({"vendor_server", "transport_error", "served_mode_mismatch"})
 # Errors our own machine raises before any byte reaches the vendor: a name lookup, no route, no file handles.
 LOCAL_NETWORK = ("NameResolutionError", "Failed to resolve", "nodename nor servname", "Name or service not known",
-                 "No route to host", "Network is unreachable", "Too many open files")
+                 "getaddrinfo failed", "11001", "No route to host", "Network is unreachable", "The host is unreachable",
+                 "Too many open files")
 DEFAULT_MAX_RESULTS = 8
 DEFAULT_MAX_FETCH_CHARS = 16000
 FETCH_TIMEOUT_S = 90

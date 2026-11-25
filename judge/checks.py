@@ -160,7 +160,9 @@ def record(source: str, timeout: float = 15.0) -> dict:
         fix, driver = Path(tmp) / "fix.py", Path(tmp) / "driver.py"
         fix.write_text(source or "")
         driver.write_text(DRIVER)
-        env = {k: v for k, v in os.environ.items() if k.upper() in ("PATH", "HOME", "LANG", "VIRTUAL_ENV", "PYTHONPATH", "TMPDIR", "SYSTEMROOT")}
+        env = {k: v for k, v in os.environ.items() if k.upper() in (
+            "PATH", "HOME", "LANG", "VIRTUAL_ENV", "PYTHONPATH", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "COMSPEC"
+        )}
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         try:
             out = subprocess.run([sys.executable, "-B", str(driver), str(fix)], cwd=tmp, env=env, capture_output=True,
