@@ -448,7 +448,7 @@ def _append_model_output(conversation: list[dict[str, Any]], response: Any) -> N
 _INPUT_FIELDS = {
     "function_call": ("type", "id", "call_id", "name", "arguments", "status"),
     "reasoning": ("type", "id", "summary", "encrypted_content"),
-    "message": ("type", "id", "role", "status", "content"),
+    "message": ("type", "id", "role", "status", "content", "phase"),
     "summary_text": ("type", "text"),
     "output_text": ("type", "text", "annotations"),
 }
