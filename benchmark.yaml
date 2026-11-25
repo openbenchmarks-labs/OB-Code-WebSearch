@@ -4,7 +4,7 @@ win: The search API with which the agent scores highest on the ranked held-out q
 obkit: 0.5.4
 sets:
   public: {path: data/questions.jsonl}
-  validation: {sha256: af80a181b43bddb2a035de0c59d22fced4f5b952b526902fe961f03ca6638c89}
+  validation: {sha256: cf47541944206368a52cd93242e2a0b6099bfe848e7d1497b68e52a6bb0c52aa}
   private: {sha256: f604569c80d76910b86e1e70fba47317282bca43bf57ab25418cdef108fbe360}
 question_id: task_id
 split_axes: [vendor, kind]
