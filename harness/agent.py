@@ -331,11 +331,11 @@ def _run_search(
         notices=meta.get("notices", []),
     )
     run.searches.append(hop)
-    # Exa's own tool output leads with the notices, then the results: exa_py/tools.py:32-37.
+    # Exa's own tool output leads with the notices, then the results: exa_py/tools.py:32-37. Every lane sees what the
+    # search used of its budget, so no setup knows more about its remaining searches than another.
     tool_result: dict[str, Any] = {**(request if tool_lane else {"query": query}),
                                    **({"notices": hop.notices} if hop.notices else {}),
-                                   **({"budget": _budget_text(n_queries, hop.n_hits > 0, left, budget_note)}
-                                      if queries_field else {}),
+                                   "budget": _budget_text(n_queries, hop.n_hits > 0, left, budget_note),
                                    "hits": hits}
     if error:
         # The vendor's own error text, the same for every vendor, so the model can act on it.
@@ -348,7 +348,7 @@ def _run_search(
 
 
 def _budget_text(n_queries: int, counted: bool, left: int, truncated: str) -> str:
-    """What a multi-query call used of the search budget, in the tool result."""
+    """What a search used of the search budget, in the tool result."""
     used = n_queries if counted else 0
     text = f"{n_queries} queries: used {used} of your searches, {left - used} left" if n_queries > 1 else (
         f"used {used} of your searches, {left - used} left")

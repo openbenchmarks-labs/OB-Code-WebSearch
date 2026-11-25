@@ -192,6 +192,8 @@ def recorded(row: dict, which: str) -> dict:
 
 VENDORS = {"gen": "Genesys Cloud", "sf": "SAP SuccessFactors", "sap": "SAP S/4HANA Cloud", "sn": "ServiceNow",
            "ukg": "UKG Pro Workforce Management", "wd": "Workday", "wds": "Workday", "vv": "Veeva Vault"}
+# UKG publishes two products under one prefix; a question whose docs are UKG Pro HCM's names that product instead.
+UKG_HCM_DOCS = "developer.ukg.com/hcm/"
 
 ANSWER_SCHEMA = {
     "type": "json_schema",
@@ -238,6 +240,8 @@ def question(row: dict) -> str:
     now = f"{r['method'].upper()} {r['path']}" + (f" (SOAP operation {r['soap']})" if r.get("soap") else "")
     qid = row["task_id"]
     vendor = VENDORS.get(qid.split("_")[1], "") if qid.count("_") >= 2 else ""
+    if vendor == VENDORS["ukg"] and UKG_HCM_DOCS in row.get("source_url", ""):
+        vendor = "UKG Pro HCM"
     return (f"Vendor: {vendor}\n" if vendor else "") + f"The program sends this request today: {now}\n" + \
         f"Ticket: {ticket_text(row)}\n\nWhich request does the ticket need?"
 
