@@ -11,12 +11,15 @@ setups:
       fetch_date: 2026-11-23
       answer_usd: {expected: 0.0025, max: 0.037, source: "17 Nov val run, 322 answers per mode, search_only 2.00 billed searches, search_and_fetch 1.57 searches + 1.33 fetches", date: 2026-11-23}
   parallel_advanced_tool:
-    mode: search_only
+    mode: [search_only, search_and_fetch]
     pricing:
       list_usd: 0.005
       basis: list
       bills_empty: true
-      answer_usd: {expected: 0.0095, max: 0.16, source: "17 Nov val run, 322 answers, 1.91 billed searches each", date: 2026-11-23}
+      fetch_usd: 0.001
+      fetch_source: https://docs.parallel.ai/getting-started/pricing (Extract API, $1 / 1,000 URLs)
+      fetch_date: 2026-11-23
+      answer_usd: {expected: 0.0093, max: 0.165, source: "17 and 20 Nov val runs, 322 answers per mode, search_only 1.91 billed searches, search_and_fetch 1.57 searches + 1.23 fetches", date: 2026-11-24}
   parallel_fast:
     mode: search_only
     pricing:
