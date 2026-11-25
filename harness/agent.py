@@ -11,6 +11,7 @@ from typing import Any
 from .search import (
     QUERY_PARAMETER,
     UNSCORED_FAILURES,
+    VENDOR_FAULTS,
     SearchBackend,
     classify_failure,
     fit_search_budget,
@@ -398,7 +399,9 @@ def _run_fetch(
     }
     if error:
         fetch_result["error"] = f"fetch failed ({hop.failure_class}, HTTP {hop.http_status})"
-        if hop.failure_class in UNSCORED_FAILURES:
+        # One page the fetch API could not serve is like any other page it could not read: the model sees the error
+        # and goes on. Only a search outage stops the attempt and, on the last one, counts as the vendor's miss.
+        if hop.failure_class in UNSCORED_FAILURES - VENDOR_FAULTS:
             run.error = error
     conversation.append(_tool_output(call, fetch_result))
 
