@@ -14,7 +14,7 @@ from pathlib import Path
 
 import yaml
 
-from .checks import asked_by_answer, grade_task
+from .checks import grade as grade_call
 
 HERE = Path(__file__).resolve().parent
 PROMPT = (HERE / "verifier_prompt.txt").read_text()
@@ -23,7 +23,7 @@ VERDICTS = {"PASS": True, "FAIL": False}
 
 
 def grade(question: dict, answer: str) -> bool:
-    return grade_task(question, answer)
+    return grade_call(question["retrieval_key"]["accepted"], answer)
 
 
 def _read(reader: dict, user: str) -> tuple[str, float]:
@@ -75,11 +75,12 @@ def verify(question: dict, answer: str, passed: bool, *, dry: bool) -> dict:
 
     load_environment()
     accepted = question["retrieval_key"]["accepted"]
-    asked = asked_by_answer(question, accepted)
     right = "\n".join(
         f"{r['method']} {r['address']}" + (f" (SOAP {r['soap']})" if r.get("soap") else "")
-        + (f" (fields: {', '.join(asked[i])})" if asked.get(i) else "")
-        for i, r in enumerate(accepted)
+        + (" (prefix)" if r.get("match") == "prefix" else "")
+        + (f" (requires $expand of {r['require_query']})" if r.get("require_query") else "")
+        + (f" (fields: {', '.join(r['fields'])})" if r.get("fields") else "")
+        for r in accepted
     )
     user = f"Task:\n{question['ticket']}\n\nRight answers:\n{right}\n\nAgent's call:\n{answer}"
     cost = 0.0

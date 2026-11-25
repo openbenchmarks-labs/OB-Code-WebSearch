@@ -17,6 +17,16 @@ from urllib.parse import urlsplit, parse_qs
 
 SEEN = []
 
+
+def keys(data, at=""):
+    """Every field name in a JSON body, nested ones as dotted paths (items.quantity)."""
+    if isinstance(data, list):
+        return {k for item in data for k in keys(item, at)}
+    if not isinstance(data, dict):
+        return set()
+    return {f"{at}{k}" for k in data} | {k for name, v in data.items() for k in keys(v, f"{at}{name}.")}
+
+
 class Stand(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def _any(self):
@@ -29,8 +39,7 @@ class Stand(BaseHTTPRequestHandler):
             soap = m.group(1) if m else None
         elif raw:
             try:
-                data = json.loads(raw)
-                body_keys = sorted(data) if isinstance(data, dict) else (sorted(data[0]) if isinstance(data, list) and data and isinstance(data[0], dict) else [])
+                body_keys = sorted(keys(json.loads(raw)))
             except ValueError:
                 body_keys = sorted(parse_qs(raw))
         SEEN.append({"method": self.command.lower(), "path": u.path, "query": {k: v[0] for k, v in parse_qs(u.query).items()},
@@ -196,78 +205,6 @@ def question(row: dict) -> str:
         f"Ticket: {ticket_text(row)}\n\nWhich request does the ticket need?"
 
 
-SLOT = "{}"
-_HOLE = "\x00"  # stands for a value the source computes at run time
-# Test values the ticket writer put where the docs have a placeholder: object_record_hard, object_hard, abc1a2b3c4d5e6.
-FIXTURE = re.compile(r":?[A-Za-z0-9_.-]+_hard\b|[a-z]{3}1a2b3c4d5e6")
-VERSION = re.compile(r"^v\d+(?:\.\d+)*$")
-PAGING = {"$format", "$top", "$skip", "$count", "$inlinecount", "$skiptoken", "format", "limit", "offset", "cursor", "page", "pagesize", "page_size"}
-# A placeholder in any style: {id}, {{id}}, <id>, URL-encoded %7Bid%7D.
-PLACEHOLDER = re.compile(r"\{\{[^{}/\s]*\}\}|\{[^{}/\s]*\}|%7B[^/\s]*?%7D|<[\w.-]+>", re.I)
-
-
-def _segment(raw: str) -> str:
-    seg = FIXTURE.sub(_HOLE, PLACEHOLDER.sub(_HOLE, raw)).lower()
-    if not seg.replace(_HOLE, "").strip(":"):
-        return SLOT
-    # An OData key reads the same entity set: BenefitInsurancePlan('abc') and BenefitInsurancePlan are one resource.
-    seg = re.sub(r"\(.*\)$", "", seg)
-    return seg.replace(_HOLE, SLOT)
-
-
-def _path_of(url: str) -> tuple[str, ...]:
-    url = re.sub(r"^[a-z][a-z0-9+.-]*://[^/]*", "", url.strip(), flags=re.I)
-    url = re.split(r"[?#]", url, maxsplit=1)[0]
-    return tuple(_segment(s) for s in url.split("/") if s)
-
-
-def _core(path: tuple[str, ...]) -> tuple[str, ...]:
-    p = path[1:] if path[:1] == ("api",) else path
-    return tuple(s for s in p if not VERSION.match(s))
-
-
-def _segments_match(agent: tuple[str, ...], ref: tuple[str, ...]) -> bool:
-    # A placeholder where the reference names its version segment is the same address.
-    return len(agent) == len(ref) and all(a == r or (a == SLOT and VERSION.match(r)) for a, r in zip(agent, ref))
-
-
-def _in_address(needle: str, request: dict) -> bool:
-    """Whether an answer string names part of a recorded request's address (or its SOAP element) rather than a
-    parameter."""
-    soap = (request.get("soap") or "").lower()
-    if soap and needle.strip().lower() == soap:
-        return True
-    segs, core = _core(_path_of("/" + needle.strip().strip("/"))), _core(_path_of(request["path"]))
-    return bool(segs) and any(_segments_match(core[i:i + len(segs)], segs) for i in range(len(core) - len(segs) + 1))
-
-
-def _words(name: str) -> list[str]:
-    return [w.lower() for w in re.split(r"[_\W]+|(?<=[a-z])(?=[A-Z])", name) if len(w) >= 3]
-
-
-def asked_fields(row: dict) -> list[str]:
-    """Parameters and body fields the reference adds over the starter that the ticket asks for."""
-    gold, starter = recorded(row, "gold")["requests"], recorded(row, "starter")["requests"]
-    if not gold:
-        return []
-    keys = lambda r: list(r.get("query", {})) + list(r.get("body_keys", []))
-    had = {k.lower() for k in (keys(starter[0]) if starter else [])}
-    ticket = ticket_text(row).lower()
-    # An answer string that is part of the address (an endpoint name such as recordLearningEvents) is not a field ask.
-    needles = " ".join(n for n in row["required"] + row["query_forbidden"] if not _in_address(n, gold[0])).lower()
-    stem = lambda w: w[:-1] if w.endswith("s") else w
-    ticket_words = {stem(w) for w in re.findall(r"[a-z]+", ticket)}
-    out = []
-    for k in keys(gold[0]):
-        if k.lower() in had or k.lower() in PAGING:
-            continue
-        words = _words(k)
-        asked = k.lower() in needles or (words and all(stem(w) in ticket_words for w in words))
-        if asked and not any(f"optional {w}" in ticket for w in words):
-            out.append(k)
-    return out
-
-
 # SAP prints some form-section keys both as sectIndex and sectionIndex.
 LABEL_ALIAS = {'sectindex': 'sectionindex'}
 
@@ -320,8 +257,11 @@ def _same(got: list[str], want: list[str]) -> bool:
 
 
 def _rest_route(call: dict, right: dict) -> bool:
-    return ((call.get('method') or '').upper() == right['method'].upper()
-            and _same(_segments(call.get('path') or ''), _segments(right['address'])))
+    """Same method and path; a right answer with `match: prefix` names a service root, and any path under it matches."""
+    got, want = _segments(call.get('path') or ''), _segments(right['address'])
+    if right.get('match') == 'prefix':
+        got = got[:len(want)]
+    return (call.get('method') or '').upper() == right['method'].upper() and _same(got, want)
 
 
 def _rest_matches(call: dict, right: dict) -> bool:
@@ -329,7 +269,10 @@ def _rest_matches(call: dict, right: dict) -> bool:
         return False
     query = str(call.get('path')) + '&' + '&'.join(map(str, call.get('fields') or []))
     need = ([right['require_query']] if right.get('require_query') else []) + _expands(right['address'])
-    return all(re.search(r'(?:^|[?&\s])\$?expand=[^&\s]*\b' + re.escape(n) + r'\b', query, re.I) for n in need)
+    if not all(re.search(r'(?:^|[?&\s])\$?expand=[^&\s]*\b' + re.escape(n) + r'\b', query, re.I) for n in need):
+        return False
+    named = _named(call)
+    return all(_norm(f) in named for f in right.get('fields') or [])
 
 
 def _norm(name: str) -> str:
@@ -350,34 +293,8 @@ def _named(call: dict) -> set[str]:
     return out
 
 
-def _unversioned(path: str) -> str:
-    return re.sub(r'/v\d+(\.\d+)*(?=/|$|\?)', '', path or '', flags=re.I)
-
-
-def asked_by_answer(row: dict, accepted: list[dict]) -> dict[int, list[str]]:
-    """The fields the ticket asks for (`asked_fields`), owed by each right answer that is the reference fix's own
-    request, with or without its version segment; another right answer may take other fields, so it owes none."""
-    gold = recorded(row, 'gold')
-    if not gold['requests']:
-        raise RuntimeError(f"{row['task_id']}: the reference fix sent no request ({gold.get('error')}), so its asked fields are unknown")
-    fields = asked_fields(row)
-    if not fields:
-        return {}
-    sent = {'method': gold['requests'][0]['method'], 'path': _unversioned(gold['requests'][0]['path']), 'fields': []}
-    return {i: fields for i, right in enumerate(accepted)
-            if not right.get('soap') and _rest_route(sent, {**right, 'address': _unversioned(right['address'])})}
-
-
-def grade_task(row: dict, answer: str | dict | None) -> bool:
-    """`grade` with the ticket's asked fields; the reference fix is recorded only for an answer that is already a
-    right call, so a wrong call costs no recording."""
-    accepted = row['retrieval_key']['accepted']
-    return grade(accepted, answer) and grade(accepted, answer, asked_by_answer(row, accepted))
-
-
-def grade(accepted: list[dict], answer: str | dict | None, asked: dict[int, list[str]] | None = None) -> bool:
-    """Whether the answer's call is one of the right answers. `asked` maps a right answer's position to the fields
-    its call must name (`asked_by_answer`)."""
+def grade(accepted: list[dict], answer: str | dict | None) -> bool:
+    """Whether the answer's call is one of the right answers, including the fields that right answer lists."""
     try:
         call = json.loads(answer) if isinstance(answer, str) else (answer or {})
     except ValueError:
@@ -386,12 +303,12 @@ def grade(accepted: list[dict], answer: str | dict | None, asked: dict[int, list
         return False
     if not accepted:
         raise ValueError('a question with no right answers')
-    for i, right in enumerate(accepted):
+    for right in accepted:
         if right.get('soap'):
-            # Workday owns each operation in one service; the call must be sent to that service
+            # the call must be sent to a service that publishes the operation; a key lists one right answer per service
             sent_to = [x.lower() for x in re.split(r'[/?]', call.get('path') or '')]
             if call.get('operation') and _op(call['operation']) == _op(right['soap']) and _service(right['address']) in sent_to:
                 return True
-        elif _rest_matches(call, right) and all(_norm(f) in _named(call) for f in (asked or {}).get(i, [])):
+        elif _rest_matches(call, right):
             return True
     return False
