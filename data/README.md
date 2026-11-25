@@ -9,7 +9,7 @@ This folder holds the 30-question public split used for offline verification (`s
 
 ## Files and schema
 
-- `questions.jsonl` — One JSON object per line. The code reads the fields below; the other fields of a row (`kind`, `n_changes`, `implemented`, `outfile`, `docs`, `required`, `query_forbidden`, `why_opaque`, `stripped`, `leak_excerpt_in_task_files`) are records from building the question, and nothing in this repo reads them.
+- `questions.jsonl` — One JSON object per line. The code reads the fields below. obkit also reads `kind` and `vendor` (the `split_axes` in `benchmark.yaml`), and on the held-out sets `crawler_open` (true when robots.txt opens the answer page to the nine crawler names; false rows run once, apart) and `question_group` (`first selection` or `extension`, the weighted groups). The other fields of a row (`n_changes`, `implemented`, `outfile`, `docs`, `required`, `query_forbidden`, `why_opaque`, `stripped`, `leak_excerpt_in_task_files`) are records from building the question, and nothing reads them.
 
 | Field | Type | Description |
 |---|---|---|

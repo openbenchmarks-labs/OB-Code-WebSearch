@@ -72,8 +72,11 @@ TINYFISH_FETCH_TIMEOUT_S = 150
 TAKO_SEARCH_URL = "https://tako.com/api/v3/search"
 PERPLEXITY_SEARCH_URL = "https://api.perplexity.ai/search"
 KEENABLE_SEARCH_URL = "https://api.keenable.ai/v1/search"
-# Failures on our side: the attempt stops and is not scored against the search tool. A transport failure (TLS,
-# connection reset, no HTTP status) is ours; a 429 is our key's rate limit or our concurrency.
+# Failures that stop the attempt without a score, so the answer is asked again (up to the scoring block's `attempts`):
+# ours (a local error, our key or account, a redirect, a 429 from our key's rate limit or our concurrency, a transport
+# failure with no HTTP status) and an outage at the vendor (a 5xx, a timeout). A ranked question left with no scored
+# answer leaves the comparison for every setup on its board, and a setup with more than `unfinished_max` of them is
+# reported but not ranked.
 # `served_mode_mismatch`: the vendor served another mode than the lane sent, so the row would measure a different
 # product.
 UNSCORED_FAILURES = frozenset({"local_error", "auth_configuration", "redirect_not_followed", "account_billing",

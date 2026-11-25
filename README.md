@@ -11,8 +11,8 @@ Published and maintained by **[OpenBenchmarks Labs](https://openbenchmarks.com)*
 Each task gives a coding agent a realistic integration ticket against an enterprise product API (such as Workday, SAP SuccessFactors, UKG, Veeva, Genesys Cloud, or ServiceNow) and the request the existing code sends today. The agent searches the web using the configured search API and produces a final API call.
 
 - **Two boards:** **Search only** and **Search & fetch** are ranked separately.
-- **Fixed protocol:** Every tool runs with the same coding model, turn limit, search budget, and day (`harness/config.yaml`).
-- **Scoring:** `judge/` grades each final answer against ground truth; [`judge/README.md`](judge/README.md#what-the-answer-grader-checks) says what the answer grader in this repo checks and what it does not. The `scoring` block in [`benchmark.yaml`](benchmark.yaml) sets how a board sums the grades: ranked questions (an answer page open to crawlers) run three times and score the share of runs that pass; the original and reserve groups are weighted; questions with no open answer page run once and are reported beside the ranking; each score has a 95% bootstrap range, and no setup is called better than another when the ranges overlap.
+- **Fixed protocol:** Every tool runs with the same coding model, turn limit and search budget (`harness/config.yaml`), and every setup of a run starts within one `window_hours` window (`benchmark.yaml`).
+- **Scoring:** `judge/` grades each final answer against ground truth; [`judge/README.md`](judge/README.md#what-the-answer-grader-checks) says what the answer grader in this repo checks and what it does not. The `scoring` block in [`benchmark.yaml`](benchmark.yaml) sets how a board sums the grades: on the private set, ranked questions (an answer page open to crawlers) run three times and score the share of their scored runs that pass; validation runs each question once; the original and reserve groups are weighted; questions with no open answer page run once and are reported beside the ranking; each score has a 95% range, and no setup is called better than another when the ranges overlap.
 
 ## Tools
 

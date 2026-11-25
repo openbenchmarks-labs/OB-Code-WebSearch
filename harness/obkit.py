@@ -357,7 +357,8 @@ def answer(question: dict, setup: str, *, dry: bool, tracer=None) -> dict:
         "input_tokens": run.llm_prompt_tokens,
         "output_tokens": run.llm_completion_tokens,
     }
-    # run.error is set only by a model failure or a search failure the harness leaves unscored: ours, not the vendor's.
+    # run.error is set by a model failure or cut-off reply, or by a search failure the harness leaves unscored (search.py
+    # UNSCORED_FAILURES: ours, or an outage at the vendor); obkit asks such an answer again.
     if run.error:
         status = "infra_error"
     elif sent and all(call.error for call in sent):
