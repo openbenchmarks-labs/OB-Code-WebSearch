@@ -278,8 +278,14 @@ def _op(s: str | None) -> str:
 
 
 def _same(got: list[str], want: list[str]) -> bool:
-    # a placeholder in the right answer matches anything; the agent's own placeholder matches only a placeholder
-    return len(got) == len(want) and all(a == b or b == '{}' for a, b in zip(got, want))
+    # a placeholder in the right answer matches anything, a whole segment or the part of one it stands for
+    # (Entity_{templateId}); the agent's own placeholder matches only a placeholder
+    return len(got) == len(want) and all(a == b or b == '{}' or ('{' in b and re.fullmatch(_part(b), a))
+                                         for a, b in zip(got, want))
+
+
+def _part(segment: str) -> str:
+    return '[^/]+'.join(re.escape(p) for p in re.split(r'\{[^}]*\}', segment))
 
 
 def _rest_route(call: dict, right: dict) -> bool:
