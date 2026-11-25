@@ -379,7 +379,8 @@ def _sent_call(request: dict) -> dict:
     """A request the stand-in recorded, written as an agent's answer."""
     query = "&".join(f"{name}={value}" for name, value in (request.get("query") or {}).items())
     return {"method": request["method"].upper(), "path": request["path"] + (f"?{query}" if query else ""),
-            "operation": request.get("soap") or "", "fields": request.get("body_keys") or []}
+            "operation": request.get("soap") or "",
+            "fields": (request.get("body_keys") or []) + (request.get("body_values") or [])}
 
 
 def selftest(path: Path) -> int:
