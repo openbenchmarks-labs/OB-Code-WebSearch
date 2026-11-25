@@ -2,7 +2,6 @@ tool: tavily
 setups:
   tavily_advanced:
     mode: [search_only, search_and_fetch]
-    class: main
     pricing:
       list_usd: 0.016
       basis: list
@@ -13,7 +12,6 @@ setups:
       answer_usd: {expected: 0.088, max: 0.528, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-23}
   tavily_basic:
     mode: [search_only, search_and_fetch]
-    class: main
     pricing:
       list_usd: 0.008
       basis: list

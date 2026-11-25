@@ -183,42 +183,30 @@ class IntentTool:
     comparison arms that measure it without its tool). The tool name and
     its description stay the shared `web_search` ones (agent.WEB_SEARCH_TOOL), so every lane sees one tool. Clauses about
     tools or request options this board does not have are left out, and each class names them. Fields the board fixes
-    (mode, depth, result count, output type, content mode, domain filter) stay fixed and hidden; only the vendor's intent
-    field and the optional fields listed per class are model-written.
+    (mode, depth, result count, output type, content mode, domain filter) stay fixed and hidden; only `query` and the
+    vendor's intent field are model-written.
     """
 
     query_description: str = ""
     intent_field: str | None = None
     intent_description: str = ""
-    # Optional model-written array fields with an enum; the strict tool lists them as required and nullable.
-    optional_fields: dict[str, dict[str, Any]] = {}
 
     @property
     def tool_parameters(self) -> dict[str, Any]:
         properties: dict[str, Any] = {"query": {"type": "string", "description": self.query_description}}
         if self.intent_field:
             properties[self.intent_field] = {"type": "string", "description": self.intent_description}
-        properties.update(self.optional_fields)
         return {"type": "object", "properties": properties, "required": list(properties),
                 "additionalProperties": False}
 
     def tool_request(self, args: dict[str, Any]) -> dict[str, Any] | None:
-        """The model's fields as sent; None when `query` or the intent field is missing or empty, or an optional field
-        is outside its schema. A null or empty optional field is left out of the request."""
+        """The model's fields as sent; None when `query` or the intent field is missing or empty."""
         request: dict[str, Any] = {}
         for name in ["query", *([self.intent_field] if self.intent_field else [])]:
             value = args.get(name)
             if not isinstance(value, str) or not value.strip():
                 return None
             request[name] = value.strip()
-        for name, schema in self.optional_fields.items():
-            value = args.get(name)
-            if value is None or value == []:
-                continue
-            if (not isinstance(value, list) or len(value) > schema["maxItems"]
-                    or any(item not in schema["items"]["enum"] for item in value)):
-                return None
-            request[name] = list(value)
         return request
 
     def search_tool(self, request: dict[str, Any], *, max_results: int, client_model: str) -> list[dict[str, str]]:
@@ -466,7 +454,7 @@ class ExaSearch(IntentTool):
                 "contents": {"highlights": True},
                 **({"includeDomains": include_domains} if include_domains else {}),
             },
-            timeout=120 if self.search_type == "deep" else SEARCH_TIMEOUT_S,
+            timeout=SEARCH_TIMEOUT_S,
         )
         return parse_exa_hits(payload, max_results=max_results)
 

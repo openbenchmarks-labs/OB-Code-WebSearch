@@ -2,7 +2,6 @@ tool: brave
 setups:
   brave:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.005
       basis: list
@@ -10,7 +9,6 @@ setups:
       answer_usd: {expected: 0.0234, max: 0.16, source: "28 Oct val run, 55 answers, 4.67 billed searches each", date: 2026-11-23}
   brave_tokens_6100:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.005
       basis: list

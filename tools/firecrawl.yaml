@@ -2,7 +2,6 @@ tool: firecrawl
 setups:
   firecrawl:
     mode: [search_only, search_and_fetch]
-    class: main
     pricing:
       list_usd: 0.01
       basis: list
@@ -13,7 +12,6 @@ setups:
       answer_usd: {expected: 0.0496, max: 0.075, source: "17 Nov val run, 322 answers per mode, search_only 4.72 billed searches, search_and_fetch 3.96 searches + 2.51 fetches", date: 2026-11-23}
   firecrawl_domains:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.01
       basis: list

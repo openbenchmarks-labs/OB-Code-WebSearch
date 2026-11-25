@@ -17,5 +17,5 @@ This folder holds the 30-question public split used for offline verification (`s
 | `set` | string | Dataset split (`public`). |
 | `vendor` | string | Target enterprise product (for example, `genesys`, `successfactors`, `workday`). |
 | `ticket` | string | Engineering prompt describing the required API call. |
-| `starter_code` | string | Starter snippet the agent patches or completes. |
+| `starter_code` | string | The existing code; the question shows the request it sends today, not the code. |
 | `reference` / ground truth fields | object | Accepted API call details used by `judge/`. |

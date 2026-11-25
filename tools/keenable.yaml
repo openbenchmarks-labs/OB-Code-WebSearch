@@ -2,7 +2,6 @@ tool: keenable
 setups:
   keenable_pro:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.004
       basis: list
@@ -10,7 +9,6 @@ setups:
       answer_usd: {expected: 0.0178, max: 0.128, source: "17 Nov val run, 322 answers, 4.46 billed searches each", date: 2026-11-23}
   keenable_realtime:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.004
       basis: list
@@ -18,7 +16,6 @@ setups:
       answer_usd: {expected: 0.0179, max: 0.128, source: "17 Nov val run, 322 answers, 4.47 billed searches each", date: 2026-11-23}
   keenable_pro_snippet4000:
     mode: search_only
-    class: main
     pricing:
       list_usd: 0.004
       basis: list

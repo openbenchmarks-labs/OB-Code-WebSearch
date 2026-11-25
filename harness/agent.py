@@ -134,17 +134,14 @@ def run_agent(
     if allow_fetch:
         tools.append(WEB_FETCH_TOOL)
     # Every lane: each search call takes a turn, including separate calls in one model response, so empty or failed
-    # searches, which do not use one of the max_searches, are still capped by max_turns.
-    extra_search_turns = 0
-    for model_turn in range(max_turns):
-        turn = model_turn + extra_search_turns
-        if turn >= max_turns:
-            break
+    # searches, which do not use one of the max_searches, are still capped by max_turns. When the turns run out with the
+    # model still calling tools, it gets one more turn with tools off to give its answer.
+    def ask(tools_off: bool) -> Any:
         llm_started = time.perf_counter()
         request = {
             "model": model, "reasoning": {"effort": reasoning_effort},
             "tools": tools, "input": conversation, "max_output_tokens": 4000, "store": False,
-            "text": {"format": text_format},
+            "text": {"format": text_format}, **({"tool_choice": "none"} if tools_off else {}),
         }
         try:
             response = client.responses.create(**request)
@@ -153,21 +150,31 @@ def run_agent(
             run.llm_ms += llm_ms
             run.error = f"{type(exc).__name__}: {exc}"
             run.llm_turns.append(LlmTurn(latency_ms=llm_ms, prompt_tokens=0, completion_tokens=0))
-            break
+            return None
         llm_ms = int((time.perf_counter() - llm_started) * 1000)
         prompt_tokens, completion_tokens = _usage(response)
         run.llm_ms += llm_ms
         run.llm_prompt_tokens += prompt_tokens
         run.llm_completion_tokens += completion_tokens
-        calls = _function_calls(response)
         run.llm_turns.append(
             LlmTurn(
                 latency_ms=llm_ms,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
-                tool_names=[_call_name(call) for call in calls],
+                tool_names=[_call_name(call) for call in _function_calls(response)],
             )
         )
+        return response
+
+    extra_search_turns = 0
+    for model_turn in range(max_turns):
+        turn = model_turn + extra_search_turns
+        if turn >= max_turns:
+            break
+        response = ask(tools_off=False)
+        if response is None:
+            return run
+        calls = _function_calls(response)
         if not calls:
             run.answer = (getattr(response, "output_text", None) or "").strip()
             return run
@@ -212,9 +219,11 @@ def run_agent(
             else:
                 conversation.append(_tool_output(call, {"error": f"unknown tool {name}"}))
             if run.error:
-                break
-        if run.error:
-            break
+                return run
+    conversation.append({"role": "user", "content": TURNS_SPENT})
+    response = ask(tools_off=True)
+    if response is not None:
+        run.answer = (getattr(response, "output_text", None) or "").strip()
     return run
 
 
@@ -234,6 +243,7 @@ def _failed_call_meta(backend: SearchBackend | None, before: Any) -> dict[str, A
 
 
 MULTI_QUERY_NOTE = "Each query in the list counts as one of your searches."
+TURNS_SPENT = "No turns are left for tools. Answer now with the request the ticket needs."
 
 
 def _search_tool(backend: SearchBackend | None) -> dict[str, Any]:
@@ -302,7 +312,7 @@ def _run_search(
         hits = []
         error = f"{type(exc).__name__}: {exc}"
         meta = _failed_call_meta(backend, before)
-    # Vendor latency is the HTTP call alone (`http_ms`), not our rate-pacing wait before it.
+    # Vendor latency is the HTTP call alone (`http_ms`).
     latency_ms = int(meta["http_ms"] if meta.get("http_ms") is not None else (time.perf_counter() - search_started) * 1000)
     hits = fit_search_budget(hits)
     hop = SearchCall(
