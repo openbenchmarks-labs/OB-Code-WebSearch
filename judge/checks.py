@@ -13,6 +13,8 @@ from pathlib import Path
 DRIVER = r'''
 import importlib.util, inspect, json, os, re, sys, threading
 import xml.etree.ElementTree as ET
+from email import policy
+from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, parse_qs
 
@@ -51,9 +53,11 @@ class Stand(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def _any(self):
         n = int(self.headers.get("Content-Length") or 0)
-        raw = self.rfile.read(n).decode("utf-8", "replace") if n else ""
+        data = self.rfile.read(n) if n else b""
+        raw = data.decode("utf-8", "replace")
         u = urlsplit(self.path)
         body_keys, body_values, soap = [], [], None
+        ctype = self.headers.get("Content-Type") or ""
         if raw.lstrip().startswith("<"):
             m = re.search(r"<(?:[\w-]+:)?Body\b[^>]*>\s*<(?:[\w-]+:)?([A-Za-z]\w*)", raw)
             soap = m.group(1) if m else None
@@ -62,6 +66,13 @@ class Stand(BaseHTTPRequestHandler):
                 body_keys, body_values = xml_body(body[0])
             except (ET.ParseError, StopIteration, IndexError):
                 pass
+        elif ctype.startswith("multipart/form-data"):
+            form = BytesParser(policy=policy.default).parsebytes(f"Content-Type: {ctype}\r\n\r\n".encode() + data)
+            for part in form.iter_parts():
+                name = part.get_param("name", header="content-disposition")
+                body_keys.append(name)
+                if not part.get_filename():
+                    body_values.append(f"{name}={part.get_content().strip()}")
         elif raw:
             try:
                 body_keys, body_values = json_body(json.loads(raw))
