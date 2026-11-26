@@ -269,14 +269,18 @@ def _key_value(value: str) -> str:
     return '{}' if not value or '{' in value else value.lower()
 
 
+VERSION = '{version}'
+
+
 def _segments(path: str) -> list[str]:
     path = re.sub(r'^https?://[^/]+', '', (path or '').split('?')[0]).rstrip('/')
     out = []
     for s in path.split('/'):
         s = re.sub(r'\(([^)]*)\)', lambda m: _answer_keys(m.group(1)), s)
-        free = re.fullmatch(r'\{[^}]*\}|v\d+(\.\d+)?', s)
         if s:
-            out.append('{}' if free else s.lower())
+            # any API version matches any other, but a version is not a placeholder: it holds a version's place only
+            out.append('{}' if re.fullmatch(r'\{[^}]*\}', s) else VERSION if re.fullmatch(r'v\d+(\.\d+)?', s, re.I)
+                       else s.lower())
     return out[1:] if out[:1] == ['api'] else out
 
 
@@ -308,8 +312,10 @@ def _op(s: str | None) -> str:
 
 def _same(got: list[str], want: list[str]) -> bool:
     # a placeholder in the right answer matches anything, a whole segment or the part of one it stands for
-    # (Entity_{templateId}); the agent's own placeholder matches only a placeholder
-    return len(got) == len(want) and all(a == b or b == '{}' or ('{' in b and re.fullmatch(_part(b), a))
+    # (Entity_{templateId}); the agent's own placeholder matches only a placeholder. A version in the right answer
+    # matches a version or the agent's placeholder for one ({api_version}), never another segment.
+    return len(got) == len(want) and all(a == b or (b == VERSION and a == '{}') or b == '{}'
+                                         or (b != VERSION and '{' in b and re.fullmatch(_part(b), a))
                                          for a, b in zip(got, want))
 
 
