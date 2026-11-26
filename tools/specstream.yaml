@@ -1,0 +1,15 @@
+tool: specstream
+setups:
+  specstream:
+    excluded: "added on 26 Nov 2026, after the version 2 validation runs; version 2 runs only the setups of those runs (STATUS.md), so this setup waits for the next run"
+    mode: [search_only, search_and_fetch]
+    pricing:
+      list_usd: 0.005
+      basis: list
+      bills_empty: false
+      source: https://specstream.ai/pricing (Web Search, $5 / 1k requests of up to 10 results; a search with no results is not billed)
+      date: 2026-11-26
+      fetch_usd: 0.0008
+      fetch_source: https://specstream.ai/pricing (Extract, $0.80 / 1k pages; a page with no text is not billed)
+      fetch_date: 2026-11-26
+      answer_usd: {expected: 0.027, max: 0.029, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-26}

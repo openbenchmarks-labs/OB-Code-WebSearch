@@ -1,6 +1,6 @@
 """Web-search backends: the HTTP call and hit shape for Parallel, Firecrawl, Exa, Linkup, Tavily, Brave (LLM Context),
-SERP RapidAPI, You.com, TinyFish, Tako, Perplexity, Nimble and Keenable. `tools/*.yaml` names the setups and the
-modes each runs in."""
+SERP RapidAPI, You.com, TinyFish, Tako, Perplexity, Nimble, Keenable and SpecStream. `tools/*.yaml` names the setups
+and the modes each runs in."""
 
 from __future__ import annotations
 
@@ -72,6 +72,8 @@ TINYFISH_FETCH_TIMEOUT_S = 150
 TAKO_SEARCH_URL = "https://tako.com/api/v3/search"
 PERPLEXITY_SEARCH_URL = "https://api.perplexity.ai/search"
 KEENABLE_SEARCH_URL = "https://api.keenable.ai/v1/search"
+SPECSTREAM_SEARCH_URL = "https://api.specstream.ai/v1/web-search"
+SPECSTREAM_EXTRACT_URL = "https://api.specstream.ai/v1/extract"
 # Failures that stop the attempt without a score, so the answer is asked again (up to the scoring block's `attempts`):
 # ours (a local error, our network, our key or account, a redirect, a 429 from our key's rate limit or our concurrency)
 # and an outage at the vendor (VENDOR_FAULTS).
@@ -663,7 +665,7 @@ class TavilySearch(IntentTool):
             "timeout": 60,
         }
         if objective.strip():
-            body["query"] = objective.strip()
+            body["query"] = objective.strip()[:2000]
         payload, _ = vendor_call(self,
             "POST",
             TAVILY_EXTRACT_URL,
@@ -1326,6 +1328,51 @@ class KeenableProSnippet4000(KeenableSearch):
     snippet_max_length = 4000
 
 
+class SpecStreamSearch(IntentTool):
+    """SpecStream web search, keyed `POST /v1/web-search` with `compact=true`, and `POST /v1/extract` as the fetch.
+
+    `compact=true` returns each result's `title`, `url`, dates and one `snippet` of the lines on its page that best
+    match the query, at most 4,000 characters (`source_max_chars`, default 4000): 8 x 4,000 is the 32,000-character
+    preview. The reply is `{"data": {...}}` with the results in `data.sources`. The model sees the description of `q`
+    in SpecStream's OpenAPI document (api.specstream.ai/openapi.json, GET /v1/web-search, read 26 Nov 2026), cut after
+    its first rule; the clauses on `passages`, page reads and paging, which this board does not use, are left out. Left
+    out as fields: `num` (8 for every vendor), `passages`, `news`, `images`, `like`/`unlike` and `speed`. Fetch sends
+    the agent's objective as `query` (at most 2,000 characters), so the page comes back as its passages closest to it,
+    within `max_chars`."""
+
+    name = "specstream"
+    # `site:` in `q` holds on every result, and a `site:` with a path also reads that page and puts it first
+    # (specstream.ai/agents.md, Search API); there is no separate domain filter, so `site:` stays as written.
+    site_lift: SiteLift = False
+    query_description = ("The question or the request in everyday words, in any language. site:, -site:, -word, "
+                         "-\"phrase\", filetype:, after: and before: (YYYY, YYYY-MM or YYYY-MM-DD) hold on every "
+                         "result: a result that breaks one is left out.")
+    last_meta: dict[str, Any] | None = None
+
+    def _headers(self) -> dict[str, str]:
+        key = os.environ.get("SPECSTREAM_API_KEY")
+        if not key:
+            raise RuntimeError(f"SPECSTREAM_API_KEY is required for {self.name}")
+        return {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+    def search(self, query: str, *, max_results: int = DEFAULT_MAX_RESULTS) -> list[dict[str, str]]:
+        headers = self._headers()
+        sent, _ = site_request(self, query)
+        payload, _ = vendor_call(self, "POST", SPECSTREAM_SEARCH_URL, headers=headers,
+                                 json_body={"q": sent, "num": max_results, "compact": True},
+                                 timeout=SEARCH_TIMEOUT_S)
+        return parse_specstream_hits(payload, max_results=max_results)
+
+    def fetch(self, url: str, *, objective: str = "") -> dict[str, str]:
+        headers = self._headers()
+        body: dict[str, Any] = {"urls": [url], "format": "markdown", "max_chars": DEFAULT_MAX_FETCH_CHARS}
+        if objective.strip():
+            body["query"] = objective.strip()[:2000]
+        payload, _ = vendor_call(self, "POST", SPECSTREAM_EXTRACT_URL, headers=headers, json_body=body,
+                                 timeout=FETCH_TIMEOUT_S)
+        return parse_specstream_extract(payload, url=url)
+
+
 def parse_parallel_hits(payload: Any, *, max_results: int = DEFAULT_MAX_RESULTS) -> list[dict[str, str]]:
     hits: list[dict[str, str]] = []
     seen: set[str] = set()
@@ -1832,6 +1879,45 @@ def parse_keenable_hits(payload: Any, *, max_results: int = DEFAULT_MAX_RESULTS)
             break
     return hits
 
+def _specstream_data(payload: Any) -> dict[str, Any]:
+    """A successful SpecStream reply is `{"data": {...}}`; a failed one is `{"error": {...}}`."""
+    data = payload.get("data") if isinstance(payload, dict) else None
+    return data if isinstance(data, dict) else {}
+
+
+def parse_specstream_hits(payload: Any, *, max_results: int = DEFAULT_MAX_RESULTS) -> list[dict[str, str]]:
+    """data.sources[].url / title / snippet, in rank order."""
+    hits: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in _specstream_data(payload).get("sources") or []:
+        if not isinstance(item, dict) or not item.get("url"):
+            continue
+        url = str(item["url"])
+        if url in seen:
+            continue
+        seen.add(url)
+        hits.append({"url": url, "title": str(item.get("title") or ""), "snippet": str(item.get("snippet") or "")})
+        if len(hits) >= max_results:
+            break
+    return hits
+
+
+def parse_specstream_extract(
+    payload: Any,
+    *,
+    url: str,
+    max_chars: int = DEFAULT_MAX_FETCH_CHARS,
+) -> dict[str, str]:
+    """data.results[0]: `status` is `ok` when the page was read (and billed); any other status is a failed fetch."""
+    results = _specstream_data(payload).get("results") or [{}]
+    item = results[0] if isinstance(results[0], dict) else {}
+    if item.get("status") != "ok":
+        raise RuntimeError(f"{url}: extract status {item.get('status') or 'missing'}")
+    content = str(item.get("text") or "")
+    if not content.strip():
+        raise RuntimeError(f"{url}: extract returned no text")
+    return {"url": str(item.get("url") or url), "title": str(item.get("title") or ""), "content": content[:max_chars]}
+
 
 def parse_tavily_extract(
     payload: Any,
@@ -2014,6 +2100,7 @@ BACKENDS: dict[str, Callable[[], SearchBackend]] = {
     "keenable_pro": KeenableSearch,
     "keenable_realtime": KeenableRealtime,
     "keenable_pro_snippet4000": KeenableProSnippet4000,
+    "specstream": SpecStreamSearch,
 }
 
 
