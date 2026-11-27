@@ -17,8 +17,9 @@ window_hours: 24
 concurrency: 16
 # Public set only: validation and private take their repeats from scoring.sets.
 repeats: 1
-# Total across every run: $2,501.07 recorded spend (9-20 Nov ledgers) plus $75 for one run on the public set.
-budget_usd: 2577
+# Total across every run: $2,501.07 recorded spend (9-20 Nov ledgers), $46.91 for the first public run (27 Nov) and
+# $80 for the run of every other vendor on the public set.
+budget_usd: 2628
 refresh_days: 30
 not_measured_max: 0.1
 judge_error_max: 0.05
