@@ -19,7 +19,7 @@ Each task gives a coding agent a realistic integration ticket against an enterpr
 
 The version 2 private run uses the 8 setups in [`STATUS.md`](STATUS.md): `firecrawl`, `keenable_pro`, `keenable_realtime`, `nimble_standard`, `parallel_advanced_tool`, `parallel_fast_tool`, `tinyfish` and `you_highlights_core`.
 
-[`tools/`](tools/README.md) configures 13 search tools, the six above plus `brave`, `exa`, `linkup`, `perplexity`, `serp`, `tako` and `tavily`, which version 2 does not run.
+[`tools/`](tools/README.md) configures 14 search tools, the six above plus `brave`, `exa`, `linkup`, `perplexity`, `serp`, `specstream`, `tako` and `tavily`, which version 2 does not run.
 
 ## Dataset
 
