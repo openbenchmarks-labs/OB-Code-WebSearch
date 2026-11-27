@@ -1,7 +1,6 @@
 tool: linkup
 setups:
   linkup_standard:
-    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: [search_only, search_and_fetch]
     pricing:
       list_usd: 0.005
@@ -12,7 +11,6 @@ setups:
       fetch_date: 2026-11-23
       answer_usd: {expected: 0.0375, max: 0.05, source: "no saved run, list_usd x 5 searches, plus fetch_usd x 5 fetches in search_and_fetch", date: 2026-11-23}
   linkup_fast:
-    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.005

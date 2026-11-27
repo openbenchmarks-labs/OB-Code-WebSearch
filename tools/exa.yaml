@@ -1,7 +1,6 @@
 tool: exa
 setups:
   exa_auto:
-    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: [search_only, search_and_fetch]
     pricing:
       list_usd: 0.007
@@ -20,7 +19,6 @@ setups:
       bills_empty: false
       answer_usd: {expected: 0.035, max: 0.035, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   exa_fast:
-    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.007
@@ -30,7 +28,6 @@ setups:
       date: 2026-11-19
       answer_usd: {expected: 0.0288, max: 0.035, source: "28 Oct val run, 55 answers, 4.11 billed searches each", date: 2026-11-23}
   exa_lite:
-    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.004
@@ -38,7 +35,6 @@ setups:
       bills_empty: false
       answer_usd: {expected: 0.02, max: 0.02, source: "no saved run, list_usd x 5 searches", date: 2026-11-23}
   exa_instant:
-    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.004

@@ -1,7 +1,6 @@
 tool: brave
 setups:
   brave:
-    excluded: "not in the version 2 validation runs of 17 and 20 Nov 2026; version 2 runs those setups only (STATUS.md), decided by the OpenBenchmarks team on 24 Nov 2026"
     mode: search_only
     pricing:
       list_usd: 0.005
